@@ -1,0 +1,21 @@
+version: 2.1
+
+jobs:
+  test:
+    docker:
+      - image: cimg/go:1.14
+    steps:
+      - checkout
+      - run: |
+              go get -u golang.org/x/lint/golint
+              go get honnef.co/go/tools/cmd/staticcheck
+              go list ./pkg/... | grep -v vendor | xargs golint -set_exit_status
+              go list ./pkg/... | grep -v vendor | xargs go vet
+              staticcheck ./pkg/...
+              go test ./pkg/...
+
+workflows:
+  version: 2
+  test:
+    jobs:
+      - test
