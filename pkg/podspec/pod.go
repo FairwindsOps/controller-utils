@@ -2,6 +2,6 @@ package podspec
 
 import "fmt"
 
-func main() {
+func DoSomething() {
 	fmt.Println("vim-go")
 }
