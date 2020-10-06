@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/meta"
-	kubeAPIMetaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -59,7 +58,7 @@ func cacheAllObjectsOfKind(ctx context.Context, apiVersion, kind string, dynamic
 		return err
 	}
 
-	objects, err := dynamicClient.Resource(mapping.Resource).Namespace("").List(ctx, kubeAPIMetaV1.ListOptions{})
+	objects, err := dynamicClient.Resource(mapping.Resource).Namespace("").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		log.GetLogger().V(0).Info("Error retrieving parent object", mapping.Resource.Version, mapping.Resource.Resource, err)
 		return err
