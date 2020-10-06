@@ -15,9 +15,9 @@ import (
 	"github.com/fairwindsops/controller-utils/pkg/log"
 )
 
-var objectCache map[string]unstructured.Unstructured
+var objectCache map[string]unstructured.Unstructured = make(map[string]unstructured.Unstructured)
 
-func GetTopController(ctx context.Context, dynamicClient *dynamic.Interface, restMapper *meta.RESTMapper, unstructuredObject metav1.Object) (metav1.Object, error) {
+func GetTopController(ctx context.Context, dynamicClient dynamic.Interface, restMapper meta.RESTMapper, unstructuredObject metav1.Object) (metav1.Object, error) {
 	owners := unstructuredObject.GetOwnerReferences()
 	if len(owners) > 0 {
 		if len(owners) > 1 {
@@ -38,7 +38,7 @@ func GetTopController(ctx context.Context, dynamicClient *dynamic.Interface, res
 			}
 			abstractObject, ok = objectCache[key]
 			if !ok {
-				return unstructuredObject, errors.New("the owner could not be found for this object")
+				return unstructuredObject, errors.New("the owner could not be found for this object " + key)
 			}
 		}
 		parentObject, err := meta.Accessor(&abstractObject)
@@ -50,21 +50,22 @@ func GetTopController(ctx context.Context, dynamicClient *dynamic.Interface, res
 	return unstructuredObject, nil
 }
 
-func cacheAllObjectsOfKind(ctx context.Context, apiVersion, kind string, dynamicClient *dynamic.Interface, restMapper *meta.RESTMapper, objectCache map[string]unstructured.Unstructured) error {
+func cacheAllObjectsOfKind(ctx context.Context, apiVersion, kind string, dynamicClient dynamic.Interface, restMapper meta.RESTMapper, objectCache map[string]unstructured.Unstructured) error {
 	fqKind := schema.FromAPIVersionAndKind(apiVersion, kind)
-	mapping, err := (*restMapper).RESTMapping(fqKind.GroupKind(), fqKind.Version)
+	mapping, err := restMapper.RESTMapping(fqKind.GroupKind(), fqKind.Version)
 	if err != nil {
 		log.GetLogger().V(0).Info("Error retrieving mapping", apiVersion, kind, err)
 		return err
 	}
 
-	objects, err := (*dynamicClient).Resource(mapping.Resource).Namespace("").List(ctx, kubeAPIMetaV1.ListOptions{})
+	objects, err := dynamicClient.Resource(mapping.Resource).Namespace("").List(ctx, kubeAPIMetaV1.ListOptions{})
 	if err != nil {
 		log.GetLogger().V(0).Info("Error retrieving parent object", mapping.Resource.Version, mapping.Resource.Resource, err)
 		return err
 	}
 	for idx, object := range objects.Items {
 		key := fmt.Sprintf("%s/%s/%s", object.GetKind(), object.GetNamespace(), object.GetName())
+
 		objectCache[key] = objects.Items[idx]
 	}
 	return nil
