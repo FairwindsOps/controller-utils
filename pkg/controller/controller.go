@@ -17,6 +17,7 @@ import (
 
 var objectCache map[string]unstructured.Unstructured = make(map[string]unstructured.Unstructured)
 
+// GetTopController finds the highest level owner of whatever object is passed in.
 func GetTopController(ctx context.Context, dynamicClient dynamic.Interface, restMapper meta.RESTMapper, unstructuredObject metav1.Object) (metav1.Object, error) {
 	owners := unstructuredObject.GetOwnerReferences()
 	if len(owners) > 0 {
