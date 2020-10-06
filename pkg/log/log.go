@@ -2,9 +2,10 @@ package log
 
 import (
 	"github.com/go-logr/logr"
+	"github.com/go-logr/logr/testing"
 )
 
-var log logr.Logger = NullLogger{}
+var log logr.Logger = testing.NullLogger{}
 
 func SetLogger(l logr.Logger) {
 	log = l
