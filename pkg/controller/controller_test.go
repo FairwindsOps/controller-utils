@@ -60,6 +60,23 @@ func TestGetTopController(t *testing.T) {
 			"spec": map[string]interface{}{},
 		},
 	}
+	pod2 := unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"kind": "Pod",
+			"metadata": map[string]interface{}{
+				"ownerReferences": []interface{}{
+					map[string]interface{}{
+						"apiVersion": "core/v1",
+						"kind":       "ReplicaNotASet",
+						"name":       "rs",
+					},
+				},
+				"name":      "poddy-bad",
+				"namespace": "test",
+			},
+			"spec": map[string]interface{}{},
+		},
+	}
 	rs := unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"kind": "ReplicaSet",
@@ -112,4 +129,8 @@ func TestGetTopController(t *testing.T) {
 	controller, err = GetTopController(context.TODO(), dynamic, restMapper, depObj)
 	assert.NoError(t, err)
 	assert.Equal(t, "dep", controller.GetName())
+	pod2Obj, err := meta.Accessor(&pod2)
+	assert.NoError(t, err)
+	controller, err = GetTopController(context.TODO(), dynamic, restMapper, pod2Obj)
+	assert.Error(t, err)
 }
