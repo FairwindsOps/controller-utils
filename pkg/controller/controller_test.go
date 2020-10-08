@@ -25,12 +25,14 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	dynamicPkg "k8s.io/client-go/dynamic"
 	dynamicFake "k8s.io/client-go/dynamic/fake"
 
 	"github.com/fairwindsops/controller-utils/pkg/log"
 )
 
-func TestGetTopController(t *testing.T) {
+func setupFakeData(t *testing.T) (dynamicPkg.Interface, meta.RESTMapper, unstructured.Unstructured, unstructured.Unstructured, unstructured.Unstructured, unstructured.Unstructured) {
+
 	// TODO move to a centralized place
 	log.SetLogger(testLog.TestLogger{T: t})
 	dynamic := dynamicFake.NewSimpleDynamicClient(k8sruntime.NewScheme())
@@ -72,7 +74,7 @@ func TestGetTopController(t *testing.T) {
 					},
 				},
 				"name":      "poddy-bad",
-				"namespace": "test",
+				"namespace": "test2",
 			},
 			"spec": map[string]interface{}{},
 		},
@@ -106,6 +108,8 @@ func TestGetTopController(t *testing.T) {
 	assert.NoError(t, err)
 	_, err = dynamic.Resource(mapping.Resource).Namespace("test").Create(context.TODO(), &pod, metav1.CreateOptions{})
 	assert.NoError(t, err)
+	_, err = dynamic.Resource(mapping.Resource).Namespace("test2").Create(context.TODO(), &pod2, metav1.CreateOptions{})
+	assert.NoError(t, err)
 	mapping, err = restMapper.RESTMapping(gv.WithKind("ReplicaSet").GroupKind())
 	assert.NoError(t, err)
 	_, err = dynamic.Resource(mapping.Resource).Namespace("test").Create(context.TODO(), &rs, metav1.CreateOptions{})
@@ -114,23 +118,30 @@ func TestGetTopController(t *testing.T) {
 	assert.NoError(t, err)
 	_, err = dynamic.Resource(mapping.Resource).Namespace("test").Create(context.TODO(), &dep, metav1.CreateOptions{})
 	assert.NoError(t, err)
-	podObj, err := meta.Accessor(&pod)
-	assert.NoError(t, err)
-	controller, err := GetTopController(context.TODO(), dynamic, restMapper, podObj)
-	assert.NoError(t, err)
-	assert.Equal(t, "dep", controller.GetName())
-	rsObj, err := meta.Accessor(&rs)
-	assert.NoError(t, err)
-	controller, err = GetTopController(context.TODO(), dynamic, restMapper, rsObj)
+	return dynamic, restMapper, pod, rs, dep, pod2
+}
+
+func TestGetTopController(t *testing.T) {
+	dynamic, restMapper, pod, rs, dep, pod2 := setupFakeData(t)
+	controller, err := GetTopController(context.TODO(), dynamic, restMapper, pod)
 	assert.NoError(t, err)
 	assert.Equal(t, "dep", controller.GetName())
-	depObj, err := meta.Accessor(&dep)
-	assert.NoError(t, err)
-	controller, err = GetTopController(context.TODO(), dynamic, restMapper, depObj)
+	controller, err = GetTopController(context.TODO(), dynamic, restMapper, rs)
 	assert.NoError(t, err)
 	assert.Equal(t, "dep", controller.GetName())
-	pod2Obj, err := meta.Accessor(&pod2)
+	controller, err = GetTopController(context.TODO(), dynamic, restMapper, dep)
 	assert.NoError(t, err)
-	controller, err = GetTopController(context.TODO(), dynamic, restMapper, pod2Obj)
+	assert.Equal(t, "dep", controller.GetName())
+	controller, err = GetTopController(context.TODO(), dynamic, restMapper, pod2)
 	assert.Error(t, err)
+}
+
+func TestGetAllTopControllers(t *testing.T) {
+	dynamic, restMapper, _, _, _, _ := setupFakeData(t)
+	controllers, err := GetAllTopControllers(context.TODO(), dynamic, restMapper, "")
+	assert.NoError(t, err)
+	assert.Equal(t, 2, len(controllers))
+	controllers, err = GetAllTopControllers(context.TODO(), dynamic, restMapper, "test")
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(controllers))
 }

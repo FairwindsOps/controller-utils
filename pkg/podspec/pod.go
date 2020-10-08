@@ -18,6 +18,7 @@ var podSpecFields = []string{"jobTemplate", "spec", "template"}
 
 // GetPodSpec looks inside arbitrary YAML for a PodSpec
 func GetPodSpec(yaml map[string]interface{}) interface{} {
+	// TODO examine this for ways to make it more efficient.
 	for _, child := range podSpecFields {
 		if childYaml, ok := yaml[child]; ok {
 			return GetPodSpec(childYaml.(map[string]interface{}))
