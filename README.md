@@ -5,6 +5,8 @@
 
 This is a library of Go functions to assist in building Kubernetes Controllers.
 
+The `pkg/controller` package contains the main functionality. `pkg/log` contains helpers around logging. You can pass in a [logr](https://github.com/go-logr/logr) object to control the logs of this library.
+
 **Want to learn more?** Reach out on [the Slack channel](https://fairwindscommunity.slack.com/messages/fairwinds-insights) ([request invite](https://join.slack.com/t/fairwindscommunity/shared_invite/zt-e3c6vj4l-3lIH6dvKqzWII5fSSFDi1g)), send an email to `opensource@fairwinds.com`, or join us for [office hours on Zoom](https://fairwindscommunity.slack.com/messages/office-hours)
 
 ## Contributing
