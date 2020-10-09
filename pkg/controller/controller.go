@@ -28,6 +28,10 @@ import (
 	"github.com/fairwindsops/controller-utils/pkg/log"
 )
 
+type warningError struct {
+	error
+}
+
 // Workload represents a workload in the cluster. It contains the top level object and all of the pods.
 type Workload struct {
 	TopController unstructured.Unstructured
@@ -48,7 +52,8 @@ func GetAllTopControllers(ctx context.Context, dynamicClient dynamic.Interface, 
 	}
 	workloadMap := map[string]Workload{}
 	objectCache := map[string]unstructured.Unstructured{}
-	for _, pod := range pods.Items {
+	dedupedPods := dedupePods(pods.Items)
+	for _, pod := range dedupedPods {
 		controller, err := GetTopController(ctx, dynamicClient, restMapper, pod, objectCache)
 		if err != nil {
 			// Do not return the error so that we can retrieve as many top level controllers as possible.
@@ -68,6 +73,24 @@ func GetAllTopControllers(ctx context.Context, dynamicClient dynamic.Interface, 
 		workloads = append(workloads, workload)
 	}
 	return workloads, nil
+}
+
+func dedupePods(pods []unstructured.Unstructured) []unstructured.Unstructured {
+
+	var dedupedPods []unstructured.Unstructured
+	dedupeMap := map[string]unstructured.Unstructured{}
+	for _, pod := range pods {
+		owners := pod.GetOwnerReferences()
+		if len(owners) == 0 {
+			dedupedPods = append(dedupedPods, pod)
+			continue
+		}
+		dedupeMap[fmt.Sprintf("%s/%s/%s", pod.GetNamespace(), owners[0].Kind, owners[0].Name)] = pod
+	}
+	for _, pod := range dedupeMap {
+		dedupedPods = append(dedupedPods, pod)
+	}
+	return dedupedPods
 }
 
 // GetTopController finds the highest level owner of whatever object is passed in.
