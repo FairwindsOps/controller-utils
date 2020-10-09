@@ -34,8 +34,8 @@ type Workload struct {
 	Pods          []unstructured.Unstructured
 }
 
-// GetAllTopControllers returns the highest level owning object of all pods. If a namespace is provided than this is limited to that namespace.
-func GetAllTopControllers(ctx context.Context, dynamicClient dynamic.Interface, restMapper meta.RESTMapper, namespace string) ([]Workload, error) {
+func getAllPods(ctx context.Context, dynamicClient dynamic.Interface, restMapper meta.RESTMapper, namespace string) ([]unstructured.Unstructured, error) {
+
 	fqKind := schema.FromAPIVersionAndKind("v1", "Pod")
 	mapping, err := restMapper.RESTMapping(fqKind.GroupKind(), fqKind.Version)
 	if err != nil {
@@ -46,9 +46,18 @@ func GetAllTopControllers(ctx context.Context, dynamicClient dynamic.Interface, 
 	if err != nil {
 		return nil, err
 	}
+	return pods.Items, nil
+}
+
+// GetAllTopControllers returns the highest level owning object of all pods. If a namespace is provided than this is limited to that namespace.
+func GetAllTopControllers(ctx context.Context, dynamicClient dynamic.Interface, restMapper meta.RESTMapper, namespace string) ([]Workload, error) {
+	pods, err := getAllPods(ctx, dynamicClient, restMapper, namespace)
+	if err != nil {
+		return nil, err
+	}
 	workloadMap := map[string]Workload{}
 	objectCache := map[string]unstructured.Unstructured{}
-	dedupedPods := dedupePods(pods.Items)
+	dedupedPods := dedupePods(pods)
 	for _, pod := range dedupedPods {
 		controller, err := GetTopController(ctx, dynamicClient, restMapper, pod, objectCache)
 		if err != nil {
@@ -62,7 +71,6 @@ func GetAllTopControllers(ctx context.Context, dynamicClient dynamic.Interface, 
 		}
 		existingWorkload.Pods = append(existingWorkload.Pods, pod)
 		workloadMap[key] = existingWorkload
-
 	}
 	workloads := make([]Workload, 0)
 	for _, workload := range workloadMap {
@@ -71,8 +79,31 @@ func GetAllTopControllers(ctx context.Context, dynamicClient dynamic.Interface, 
 	return workloads, nil
 }
 
-func dedupePods(pods []unstructured.Unstructured) []unstructured.Unstructured {
+// GetAllTopControllersSummary returns the highest level owning object of all pods and all of the pods. If a namespace is provided than this is limited to that namespace.
+func GetAllTopControllersSummary(ctx context.Context, dynamicClient dynamic.Interface, restMapper meta.RESTMapper, namespace string) ([]unstructured.Unstructured, error) {
+	pods, err := getAllPods(ctx, dynamicClient, restMapper, namespace)
+	if err != nil {
+		return nil, err
+	}
+	workloadMap := map[string]unstructured.Unstructured{}
+	objectCache := map[string]unstructured.Unstructured{}
+	for _, pod := range pods {
+		controller, err := GetTopController(ctx, dynamicClient, restMapper, pod, objectCache)
+		if err != nil {
+			// Do not return the error so that we can retrieve as many top level controllers as possible.
+			log.GetLogger().Error(err, "An error occured retrieving the top level controller for this pod", pod.GetName(), pod.GetNamespace())
+		}
+		key := fmt.Sprintf("%s/%s/%s", controller.GetNamespace(), controller.GetKind(), controller.GetName())
+		workloadMap[key] = controller
+	}
+	workloads := make([]unstructured.Unstructured, 0)
+	for _, workload := range workloadMap {
+		workloads = append(workloads, workload)
+	}
+	return workloads, nil
+}
 
+func dedupePods(pods []unstructured.Unstructured) []unstructured.Unstructured {
 	var dedupedPods []unstructured.Unstructured
 	dedupeMap := map[string]unstructured.Unstructured{}
 	for _, pod := range pods {
@@ -93,6 +124,9 @@ func dedupePods(pods []unstructured.Unstructured) []unstructured.Unstructured {
 func GetTopController(ctx context.Context, dynamicClient dynamic.Interface, restMapper meta.RESTMapper, unstructuredObject unstructured.Unstructured, objectCache map[string]unstructured.Unstructured) (unstructured.Unstructured, error) {
 	owners := unstructuredObject.GetOwnerReferences()
 	if len(owners) > 0 {
+		if objectCache == nil {
+			objectCache = map[string]unstructured.Unstructured{}
+		}
 		if len(owners) > 1 {
 			log.GetLogger().V(1).Info("Found more than one owner", unstructuredObject.GetName(), unstructuredObject.GetNamespace())
 		}
