@@ -28,17 +28,10 @@ import (
 	"github.com/fairwindsops/controller-utils/pkg/log"
 )
 
-var objectCache map[string]unstructured.Unstructured = make(map[string]unstructured.Unstructured)
-
 // Workload represents a workload in the cluster. It contains the top level object and all of the pods.
 type Workload struct {
 	TopController unstructured.Unstructured
 	Pods          []unstructured.Unstructured
-}
-
-// ResetCache clears the cache of objects
-func ResetCache() {
-	objectCache = make(map[string]unstructured.Unstructured)
 }
 
 // GetAllTopControllers returns the highest level owning object of all pods. If a namespace is provided than this is limited to that namespace.
@@ -49,14 +42,14 @@ func GetAllTopControllers(ctx context.Context, dynamicClient dynamic.Interface, 
 		log.GetLogger().Error(err, "Error retrieving mapping", "v1", "Pod")
 		return nil, err
 	}
-	ResetCache()
 	pods, err := dynamicClient.Resource(mapping.Resource).Namespace(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
 	workloadMap := map[string]Workload{}
+	objectCache := map[string]unstructured.Unstructured{}
 	for _, pod := range pods.Items {
-		controller, err := GetTopController(ctx, dynamicClient, restMapper, pod)
+		controller, err := GetTopController(ctx, dynamicClient, restMapper, pod, objectCache)
 		if err != nil {
 			// Do not return the error so that we can retrieve as many top level controllers as possible.
 			log.GetLogger().Error(err, "An error occured retrieving the top level controller for this pod", pod.GetName(), pod.GetNamespace())
@@ -78,7 +71,7 @@ func GetAllTopControllers(ctx context.Context, dynamicClient dynamic.Interface, 
 }
 
 // GetTopController finds the highest level owner of whatever object is passed in.
-func GetTopController(ctx context.Context, dynamicClient dynamic.Interface, restMapper meta.RESTMapper, unstructuredObject unstructured.Unstructured) (unstructured.Unstructured, error) {
+func GetTopController(ctx context.Context, dynamicClient dynamic.Interface, restMapper meta.RESTMapper, unstructuredObject unstructured.Unstructured, objectCache map[string]unstructured.Unstructured) (unstructured.Unstructured, error) {
 	owners := unstructuredObject.GetOwnerReferences()
 	if len(owners) > 0 {
 		if len(owners) > 1 {
@@ -102,7 +95,7 @@ func GetTopController(ctx context.Context, dynamicClient dynamic.Interface, rest
 				return unstructuredObject, errors.New("the owner could not be found for this object " + key)
 			}
 		}
-		return GetTopController(ctx, dynamicClient, restMapper, abstractObject)
+		return GetTopController(ctx, dynamicClient, restMapper, abstractObject, objectCache)
 	}
 	return unstructuredObject, nil
 }

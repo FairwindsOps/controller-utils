@@ -123,16 +123,16 @@ func setupFakeData(t *testing.T) (dynamicPkg.Interface, meta.RESTMapper, unstruc
 
 func TestGetTopController(t *testing.T) {
 	dynamic, restMapper, pod, rs, dep, pod2 := setupFakeData(t)
-	controller, err := GetTopController(context.TODO(), dynamic, restMapper, pod)
+	controller, err := GetTopController(context.TODO(), dynamic, restMapper, pod, map[string]unstructured.Unstructured{})
 	assert.NoError(t, err)
 	assert.Equal(t, "dep", controller.GetName())
-	controller, err = GetTopController(context.TODO(), dynamic, restMapper, rs)
+	controller, err = GetTopController(context.TODO(), dynamic, restMapper, rs, map[string]unstructured.Unstructured{})
 	assert.NoError(t, err)
 	assert.Equal(t, "dep", controller.GetName())
-	controller, err = GetTopController(context.TODO(), dynamic, restMapper, dep)
+	controller, err = GetTopController(context.TODO(), dynamic, restMapper, dep, map[string]unstructured.Unstructured{})
 	assert.NoError(t, err)
 	assert.Equal(t, "dep", controller.GetName())
-	controller, err = GetTopController(context.TODO(), dynamic, restMapper, pod2)
+	controller, err = GetTopController(context.TODO(), dynamic, restMapper, pod2, map[string]unstructured.Unstructured{})
 	assert.Error(t, err)
 }
 
