@@ -35,7 +35,6 @@ type Workload struct {
 }
 
 func getAllPods(ctx context.Context, dynamicClient dynamic.Interface, restMapper meta.RESTMapper, namespace string) ([]unstructured.Unstructured, error) {
-
 	fqKind := schema.FromAPIVersionAndKind("v1", "Pod")
 	mapping, err := restMapper.RESTMapping(fqKind.GroupKind(), fqKind.Version)
 	if err != nil {
@@ -57,14 +56,13 @@ func GetAllTopControllers(ctx context.Context, dynamicClient dynamic.Interface, 
 	}
 	workloadMap := map[string]Workload{}
 	objectCache := map[string]unstructured.Unstructured{}
-	dedupedPods := dedupePods(pods)
-	for _, pod := range dedupedPods {
+	for _, pod := range pods {
 		controller, err := GetTopController(ctx, dynamicClient, restMapper, pod, objectCache)
 		if err != nil {
 			// Do not return the error so that we can retrieve as many top level controllers as possible.
 			log.GetLogger().Error(err, "An error occured retrieving the top level controller for this pod", pod.GetName(), pod.GetNamespace())
 		}
-		key := fmt.Sprintf("%s/%s/%s", controller.GetNamespace(), controller.GetKind(), controller.GetName())
+		key := getControllerKey(controller)
 		existingWorkload, ok := workloadMap[key]
 		if !ok {
 			existingWorkload.TopController = controller
@@ -87,20 +85,24 @@ func GetAllTopControllersSummary(ctx context.Context, dynamicClient dynamic.Inte
 	}
 	workloadMap := map[string]unstructured.Unstructured{}
 	objectCache := map[string]unstructured.Unstructured{}
-	for _, pod := range pods {
+	dedupedPods := dedupePods(pods)
+	for _, pod := range dedupedPods {
 		controller, err := GetTopController(ctx, dynamicClient, restMapper, pod, objectCache)
 		if err != nil {
 			// Do not return the error so that we can retrieve as many top level controllers as possible.
 			log.GetLogger().Error(err, "An error occured retrieving the top level controller for this pod", pod.GetName(), pod.GetNamespace())
 		}
-		key := fmt.Sprintf("%s/%s/%s", controller.GetNamespace(), controller.GetKind(), controller.GetName())
-		workloadMap[key] = controller
+		workloadMap[getControllerKey(controller)] = controller
 	}
 	workloads := make([]unstructured.Unstructured, 0)
 	for _, workload := range workloadMap {
 		workloads = append(workloads, workload)
 	}
 	return workloads, nil
+}
+
+func getControllerKey(controller unstructured.Unstructured) string {
+	return fmt.Sprintf("%s/%s/%s", controller.GetNamespace(), controller.GetKind(), controller.GetName())
 }
 
 func dedupePods(pods []unstructured.Unstructured) []unstructured.Unstructured {
@@ -167,7 +169,7 @@ func cacheAllObjectsOfKind(ctx context.Context, apiVersion, kind, namespace stri
 		return err
 	}
 	for idx, object := range objects.Items {
-		key := fmt.Sprintf("%s/%s/%s", object.GetKind(), object.GetNamespace(), object.GetName())
+		key := getControllerKey(object)
 
 		objectCache[key] = objects.Items[idx]
 	}
