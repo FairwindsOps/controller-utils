@@ -28,10 +28,6 @@ import (
 	"github.com/fairwindsops/controller-utils/pkg/log"
 )
 
-type warningError struct {
-	error
-}
-
 // Workload represents a workload in the cluster. It contains the top level object and all of the pods.
 type Workload struct {
 	TopController unstructured.Unstructured
