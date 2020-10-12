@@ -102,7 +102,7 @@ func GetAllTopControllersSummary(ctx context.Context, dynamicClient dynamic.Inte
 }
 
 func getControllerKey(controller unstructured.Unstructured) string {
-	return fmt.Sprintf("%s/%s/%s", controller.GetNamespace(), controller.GetKind(), controller.GetName())
+	return fmt.Sprintf("%s/%s/%s", controller.GetKind(), controller.GetNamespace(), controller.GetName())
 }
 
 func dedupePods(pods []unstructured.Unstructured) []unstructured.Unstructured {
@@ -147,7 +147,7 @@ func GetTopController(ctx context.Context, dynamicClient dynamic.Interface, rest
 			}
 			abstractObject, ok = objectCache[key]
 			if !ok {
-				return unstructuredObject, errors.New("the owner could not be found for this object " + key)
+				return unstructuredObject, errors.New("this object could not be found for this object " + key)
 			}
 		}
 		return GetTopController(ctx, dynamicClient, restMapper, abstractObject, objectCache)
