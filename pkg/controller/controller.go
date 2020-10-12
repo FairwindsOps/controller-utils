@@ -56,6 +56,7 @@ func GetAllTopControllers(ctx context.Context, dynamicClient dynamic.Interface, 
 	}
 	workloadMap := map[string]Workload{}
 	objectCache := map[string]unstructured.Unstructured{}
+	// TODO avoid cycling over multiple pods with the same parent
 	for _, pod := range pods {
 		controller, err := GetTopController(ctx, dynamicClient, restMapper, pod, objectCache)
 		if err != nil {
