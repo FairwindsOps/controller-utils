@@ -1,0 +1,55 @@
+{
+    "apiVersion": "apps/v1",
+    "kind": "Deployment",
+    "metadata": {
+        "annotations": {
+        },
+        "labels": {
+            "k8s-app": "deployment"
+        },
+        "name": "dep",
+        "namespace": "default"
+    },
+    "spec": {
+        "progressDeadlineSeconds": 600,
+        "replicas": 2,
+        "revisionHistoryLimit": 10,
+        "selector": {
+            "matchLabels": {
+                "k8s-app": "deployment"
+            }
+        },
+        "strategy": {
+            "rollingUpdate": {
+                "maxSurge": "25%",
+                "maxUnavailable": 1
+            },
+            "type": "RollingUpdate"
+        },
+        "template": {
+            "metadata": {
+                "labels": {
+                    "k8s-app": "deployment"
+                }
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "image": "ubuntu:latest",
+                        "imagePullPolicy": "Always",
+                        "name": "container",
+                        "resources": {
+                            "limits": {
+                                "memory": "170Mi"
+                            },
+                            "requests": {
+                                "cpu": "100m",
+                                "memory": "70Mi"
+                            }
+                        }
+                    }
+                ]
+            }
+        }
+    }
+}
