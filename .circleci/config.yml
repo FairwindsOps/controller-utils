@@ -19,7 +19,6 @@ jobs:
               go list ./pkg/... | grep -v vendor | xargs go vet
               staticcheck ./pkg/...
               go test ./pkg/... -coverprofile=coverage.txt -covermode=count
-              bash <(curl -s https://codecov.io/bash)
 
 workflows:
   version: 2
