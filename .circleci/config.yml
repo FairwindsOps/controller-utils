@@ -1,5 +1,8 @@
 version: 2.1
 
+orbs:
+  rok8s: fairwinds/rok8s-scripts@11
+
 references:
   install_vault: &install_vault
     run:
