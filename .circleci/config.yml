@@ -1,12 +1,30 @@
 version: 2.1
 
+orbs:
+  rok8s: fairwinds/rok8s-scripts@11
+
+references:
+  install_vault: &install_vault
+    run:
+      name: install hashicorp vault
+      command: |
+        apk --update add curl yq
+        cd /tmp
+        curl -LO https://releases.hashicorp.com/vault/1.9.2/vault_1.9.2_linux_amd64.zip
+        unzip vault_1.9.2_linux_amd64.zip
+        mv vault /usr/bin/vault
+
 jobs:
   release:
     docker:
-      - image: cimg/go:1.17
+      - image: goreleaser/goreleaser:v1.2.5
     steps:
       - checkout
-      - run: curl -sL https://git.io/goreleaser | bash
+      - *install_vault
+      - rok8s/get_vault_env:
+          vault_path: repo/global/env
+      - run: echo 'export GORELEASER_CURRENT_TAG="${CIRCLE_TAG}"' >> $BASH_ENV
+      - run: goreleaser
   test:
     docker:
       - image: cimg/go:1.17
