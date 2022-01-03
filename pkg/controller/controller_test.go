@@ -114,7 +114,6 @@ func setupFakeData(t *testing.T) (dynamicPkg.Interface, meta.RESTMapper, unstruc
 			{Group: "apps", Version: "v1", Resource: "deployments"}: "DeploymentList",
 			{Group: "", Version: "v1", Resource: "pods"}:            "PodsList",
 		},
-		&pod, &pod2,
 	)
 	mapping, err := restMapper.RESTMapping(gvpod.WithKind("Pod").GroupKind())
 	assert.NoError(t, err)
