@@ -20,7 +20,7 @@ We label issues with the ["good first issue" tag](https://github.com/FairwindsOp
 
 ## Setting Up Your Development Environment
 ### Prerequisites
-* A properly configured Golang environment with Go 1.13 or higher
+* A properly configured Golang environment with Go 1.17 or higher
 
 ## Running Tests
 

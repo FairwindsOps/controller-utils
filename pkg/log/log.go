@@ -16,10 +16,9 @@ package log
 
 import (
 	"github.com/go-logr/logr"
-	"github.com/go-logr/logr/testing"
 )
 
-var log logr.Logger = testing.NullLogger{}
+var log logr.Logger = logr.Discard()
 
 // SetLogger sets the logger to be used for this library.
 func SetLogger(l logr.Logger) {

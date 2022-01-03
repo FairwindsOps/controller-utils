@@ -34,7 +34,7 @@ import (
 func setupFakeData(t *testing.T) (dynamicPkg.Interface, meta.RESTMapper, unstructured.Unstructured, unstructured.Unstructured, unstructured.Unstructured, unstructured.Unstructured) {
 
 	// TODO move to a centralized place
-	log.SetLogger(testLog.TestLogger{T: t})
+	log.SetLogger(testLog.NewTestLogger(t))
 	dynamic := dynamicFake.NewSimpleDynamicClient(k8sruntime.NewScheme())
 	gv := schema.GroupVersion{Group: "apps", Version: "v1"}
 	gvpod := schema.GroupVersion{Group: "", Version: "v1"}
