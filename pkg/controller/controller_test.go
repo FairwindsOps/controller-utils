@@ -23,10 +23,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	k8sruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	dynamicPkg "k8s.io/client-go/dynamic"
-	dynamicFake "k8s.io/client-go/dynamic/fake"
+	"k8s.io/client-go/dynamic/fake"
 
 	"github.com/fairwindsops/controller-utils/pkg/log"
 )
@@ -34,8 +34,7 @@ import (
 func setupFakeData(t *testing.T) (dynamicPkg.Interface, meta.RESTMapper, unstructured.Unstructured, unstructured.Unstructured, unstructured.Unstructured, unstructured.Unstructured) {
 
 	// TODO move to a centralized place
-	log.SetLogger(testLog.TestLogger{T: t})
-	dynamic := dynamicFake.NewSimpleDynamicClient(k8sruntime.NewScheme())
+	log.SetLogger(testLog.NewTestLogger(t))
 	gv := schema.GroupVersion{Group: "apps", Version: "v1"}
 	gvpod := schema.GroupVersion{Group: "", Version: "v1"}
 	gvk := gv.WithKind("Deployment")
@@ -47,7 +46,9 @@ func setupFakeData(t *testing.T) (dynamicPkg.Interface, meta.RESTMapper, unstruc
 	restMapper.Add(gvk, meta.RESTScopeNamespace)
 	pod := unstructured.Unstructured{
 		Object: map[string]interface{}{
-			"kind": "Pod",
+			"apiVersion": "apps/v1",
+			"kind":       "Pod",
+			"namespace":  "test",
 			"metadata": map[string]interface{}{
 				"ownerReferences": []interface{}{
 					map[string]interface{}{
@@ -64,7 +65,8 @@ func setupFakeData(t *testing.T) (dynamicPkg.Interface, meta.RESTMapper, unstruc
 	}
 	pod2 := unstructured.Unstructured{
 		Object: map[string]interface{}{
-			"kind": "Pod",
+			"apiVersion": "core/v1",
+			"kind":       "Pod",
 			"metadata": map[string]interface{}{
 				"ownerReferences": []interface{}{
 					map[string]interface{}{
@@ -81,7 +83,8 @@ func setupFakeData(t *testing.T) (dynamicPkg.Interface, meta.RESTMapper, unstruc
 	}
 	rs := unstructured.Unstructured{
 		Object: map[string]interface{}{
-			"kind": "ReplicaSet",
+			"apiVersion": "apps/v1",
+			"kind":       "ReplicaSet",
 			"metadata": map[string]interface{}{
 				"ownerReferences": []interface{}{
 					map[string]interface{}{
@@ -97,13 +100,21 @@ func setupFakeData(t *testing.T) (dynamicPkg.Interface, meta.RESTMapper, unstruc
 	}
 	dep := unstructured.Unstructured{
 		Object: map[string]interface{}{
-			"kind": "Deployment",
+			"apiVersion": "apps/v1",
+			"kind":       "Deployment",
 			"metadata": map[string]interface{}{
 				"name":      "dep",
 				"namespace": "test",
 			},
 		},
 	}
+	dynamic := fake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(),
+		map[schema.GroupVersionResource]string{
+			{Group: "apps", Version: "v1", Resource: "replicasets"}: "ReplicaSetList",
+			{Group: "apps", Version: "v1", Resource: "deployments"}: "DeploymentList",
+			{Group: "", Version: "v1", Resource: "pods"}:            "PodsList",
+		},
+	)
 	mapping, err := restMapper.RESTMapping(gvpod.WithKind("Pod").GroupKind())
 	assert.NoError(t, err)
 	_, err = dynamic.Resource(mapping.Resource).Namespace("test").Create(context.TODO(), &pod, metav1.CreateOptions{})
