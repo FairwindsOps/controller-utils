@@ -108,40 +108,13 @@ func setupFakeData(t *testing.T) (dynamicPkg.Interface, meta.RESTMapper, unstruc
 			},
 		},
 	}
-	rs2 := unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"apiVersion": "apps/v1",
-			"kind":       "ReplicaSet",
-			"metadata": map[string]interface{}{
-				"ownerReferences": []interface{}{
-					map[string]interface{}{
-						"apiVersion": "apps/v1",
-						"kind":       "Deployment",
-						"name":       "dep",
-					},
-				},
-				"name":      "rs2",
-				"namespace": "test",
-			},
-		},
-	}
-	dep2 := unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"apiVersion": "apps/v1",
-			"kind":       "Deployment",
-			"metadata": map[string]interface{}{
-				"name":      "dep2",
-				"namespace": "test",
-			},
-		},
-	}
 	dynamic := fake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(),
 		map[schema.GroupVersionResource]string{
 			{Group: "apps", Version: "v1", Resource: "replicasets"}: "ReplicaSetList",
 			{Group: "apps", Version: "v1", Resource: "deployments"}: "DeploymentList",
 			{Group: "", Version: "v1", Resource: "pods"}:            "PodsList",
 		},
-		&pod, &pod2, &rs, &dep,
+		&pod, &pod2,
 	)
 	mapping, err := restMapper.RESTMapping(gvpod.WithKind("Pod").GroupKind())
 	assert.NoError(t, err)
@@ -151,11 +124,11 @@ func setupFakeData(t *testing.T) (dynamicPkg.Interface, meta.RESTMapper, unstruc
 	assert.NoError(t, err)
 	mapping, err = restMapper.RESTMapping(gv.WithKind("ReplicaSet").GroupKind())
 	assert.NoError(t, err)
-	_, err = dynamic.Resource(mapping.Resource).Namespace("test").Create(context.TODO(), &rs2, metav1.CreateOptions{})
+	_, err = dynamic.Resource(mapping.Resource).Namespace("test").Create(context.TODO(), &rs, metav1.CreateOptions{})
 	assert.NoError(t, err)
 	mapping, err = restMapper.RESTMapping(gv.WithKind("Deployment").GroupKind())
 	assert.NoError(t, err)
-	_, err = dynamic.Resource(mapping.Resource).Namespace("test").Create(context.TODO(), &dep2, metav1.CreateOptions{})
+	_, err = dynamic.Resource(mapping.Resource).Namespace("test").Create(context.TODO(), &dep, metav1.CreateOptions{})
 	assert.NoError(t, err)
 	return dynamic, restMapper, pod, rs, dep, pod2
 }
