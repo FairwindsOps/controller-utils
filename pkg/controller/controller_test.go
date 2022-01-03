@@ -23,10 +23,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	k8sruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	dynamicPkg "k8s.io/client-go/dynamic"
-	dynamicFake "k8s.io/client-go/dynamic/fake"
+	"k8s.io/client-go/dynamic/fake"
 
 	"github.com/fairwindsops/controller-utils/pkg/log"
 )
@@ -35,7 +35,6 @@ func setupFakeData(t *testing.T) (dynamicPkg.Interface, meta.RESTMapper, unstruc
 
 	// TODO move to a centralized place
 	log.SetLogger(testLog.NewTestLogger(t))
-	dynamic := dynamicFake.NewSimpleDynamicClient(k8sruntime.NewScheme())
 	gv := schema.GroupVersion{Group: "apps", Version: "v1"}
 	gvpod := schema.GroupVersion{Group: "", Version: "v1"}
 	gvk := gv.WithKind("Deployment")
@@ -47,7 +46,9 @@ func setupFakeData(t *testing.T) (dynamicPkg.Interface, meta.RESTMapper, unstruc
 	restMapper.Add(gvk, meta.RESTScopeNamespace)
 	pod := unstructured.Unstructured{
 		Object: map[string]interface{}{
-			"kind": "Pod",
+			"apiVersion": "apps/v1",
+			"kind":       "Pod",
+			"namespace":  "test",
 			"metadata": map[string]interface{}{
 				"ownerReferences": []interface{}{
 					map[string]interface{}{
@@ -64,7 +65,8 @@ func setupFakeData(t *testing.T) (dynamicPkg.Interface, meta.RESTMapper, unstruc
 	}
 	pod2 := unstructured.Unstructured{
 		Object: map[string]interface{}{
-			"kind": "Pod",
+			"apiVersion": "core/v1",
+			"kind":       "Pod",
 			"metadata": map[string]interface{}{
 				"ownerReferences": []interface{}{
 					map[string]interface{}{
@@ -81,7 +83,8 @@ func setupFakeData(t *testing.T) (dynamicPkg.Interface, meta.RESTMapper, unstruc
 	}
 	rs := unstructured.Unstructured{
 		Object: map[string]interface{}{
-			"kind": "ReplicaSet",
+			"apiVersion": "apps/v1",
+			"kind":       "ReplicaSet",
 			"metadata": map[string]interface{}{
 				"ownerReferences": []interface{}{
 					map[string]interface{}{
@@ -97,13 +100,49 @@ func setupFakeData(t *testing.T) (dynamicPkg.Interface, meta.RESTMapper, unstruc
 	}
 	dep := unstructured.Unstructured{
 		Object: map[string]interface{}{
-			"kind": "Deployment",
+			"apiVersion": "apps/v1",
+			"kind":       "Deployment",
 			"metadata": map[string]interface{}{
 				"name":      "dep",
 				"namespace": "test",
 			},
 		},
 	}
+	rs2 := unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "apps/v1",
+			"kind":       "ReplicaSet",
+			"metadata": map[string]interface{}{
+				"ownerReferences": []interface{}{
+					map[string]interface{}{
+						"apiVersion": "apps/v1",
+						"kind":       "Deployment",
+						"name":       "dep",
+					},
+				},
+				"name":      "rs2",
+				"namespace": "test",
+			},
+		},
+	}
+	dep2 := unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "apps/v1",
+			"kind":       "Deployment",
+			"metadata": map[string]interface{}{
+				"name":      "dep2",
+				"namespace": "test",
+			},
+		},
+	}
+	dynamic := fake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(),
+		map[schema.GroupVersionResource]string{
+			{Group: "apps", Version: "v1", Resource: "replicasets"}: "ReplicaSetList",
+			{Group: "apps", Version: "v1", Resource: "deployments"}: "DeploymentList",
+			{Group: "", Version: "v1", Resource: "pods"}:            "PodsList",
+		},
+		&pod, &pod2, &rs, &dep,
+	)
 	mapping, err := restMapper.RESTMapping(gvpod.WithKind("Pod").GroupKind())
 	assert.NoError(t, err)
 	_, err = dynamic.Resource(mapping.Resource).Namespace("test").Create(context.TODO(), &pod, metav1.CreateOptions{})
@@ -112,11 +151,11 @@ func setupFakeData(t *testing.T) (dynamicPkg.Interface, meta.RESTMapper, unstruc
 	assert.NoError(t, err)
 	mapping, err = restMapper.RESTMapping(gv.WithKind("ReplicaSet").GroupKind())
 	assert.NoError(t, err)
-	_, err = dynamic.Resource(mapping.Resource).Namespace("test").Create(context.TODO(), &rs, metav1.CreateOptions{})
+	_, err = dynamic.Resource(mapping.Resource).Namespace("test").Create(context.TODO(), &rs2, metav1.CreateOptions{})
 	assert.NoError(t, err)
 	mapping, err = restMapper.RESTMapping(gv.WithKind("Deployment").GroupKind())
 	assert.NoError(t, err)
-	_, err = dynamic.Resource(mapping.Resource).Namespace("test").Create(context.TODO(), &dep, metav1.CreateOptions{})
+	_, err = dynamic.Resource(mapping.Resource).Namespace("test").Create(context.TODO(), &dep2, metav1.CreateOptions{})
 	assert.NoError(t, err)
 	return dynamic, restMapper, pod, rs, dep, pod2
 }
