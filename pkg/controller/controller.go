@@ -28,6 +28,23 @@ import (
 	"github.com/fairwindsops/controller-utils/pkg/log"
 )
 
+type knownKind struct {
+	kind string
+	apiVersion string
+}
+
+var knownKinds = []knownKind{{
+	"Deployment", "apps/v1",
+}, {
+	"CronJob", "batch/v1",
+}, {
+	"Job", "batch/v1",
+}, {
+	"DaemonSet", "apps/v1",
+}, {
+	"StatefulSet", "apps/v1",
+}}
+
 // Workload represents a workload in the cluster. It contains the top level object and all of the pods.
 type Workload struct {
 	TopController unstructured.Unstructured
@@ -48,14 +65,34 @@ func getAllPods(ctx context.Context, dynamicClient dynamic.Interface, restMapper
 	return pods.Items, nil
 }
 
+func prepCacheWithKnownControllers(ctx context.Context, dynamicClient dynamic.Interface, restMapper meta.RESTMapper, namespace string, objectCache map[string]unstructured.Unstructured) error {
+	for _, kind := range knownKinds {
+		err := cacheAllObjectsOfKind(ctx, kind.apiVersion, kind.kind, namespace, dynamicClient, restMapper, objectCache)
+		if err != nil {
+			log.GetLogger().V(3).Info("Unable to prime cache with objects of kind " + kind.kind)
+		}
+	}
+	return nil
+}
+
 // GetAllTopControllers returns the highest level owning object of all pods. If a namespace is provided than this is limited to that namespace.
 func GetAllTopControllers(ctx context.Context, dynamicClient dynamic.Interface, restMapper meta.RESTMapper, namespace string) ([]Workload, error) {
+	workloadMap := map[string]Workload{}
+	objectCache := map[string]unstructured.Unstructured{}
+	err := prepCacheWithKnownControllers(ctx, dynamicClient, restMapper, namespace, objectCache)
+	if err != nil {
+		return nil, err
+	}
+	for _, controller := range objectCache {
+		key := getControllerKey(controller)
+		workloadMap[key] = Workload{
+			TopController: controller,
+		}
+	}
 	pods, err := getAllPods(ctx, dynamicClient, restMapper, namespace)
 	if err != nil {
 		return nil, err
 	}
-	workloadMap := map[string]Workload{}
-	objectCache := map[string]unstructured.Unstructured{}
 	// TODO avoid cycling over multiple pods with the same parent
 	for _, pod := range pods {
 		controller, err := GetTopController(ctx, dynamicClient, restMapper, pod, objectCache)
@@ -157,6 +194,7 @@ func GetTopController(ctx context.Context, dynamicClient dynamic.Interface, rest
 }
 
 func cacheAllObjectsOfKind(ctx context.Context, apiVersion, kind, namespace string, dynamicClient dynamic.Interface, restMapper meta.RESTMapper, objectCache map[string]unstructured.Unstructured) error {
+	fmt.Println("cache all", apiVersion, kind)
 	fqKind := schema.FromAPIVersionAndKind(apiVersion, kind)
 	mapping, err := restMapper.RESTMapping(fqKind.GroupKind(), fqKind.Version)
 	if err != nil {

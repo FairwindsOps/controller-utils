@@ -108,6 +108,16 @@ func setupFakeData(t *testing.T) (dynamicPkg.Interface, meta.RESTMapper, unstruc
 			},
 		},
 	}
+	depNoPods := unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "apps/v1",
+			"kind":       "Deployment",
+			"metadata": map[string]interface{}{
+				"name":      "dep-no-pods",
+				"namespace": "test",
+			},
+		},
+	}
 	dynamic := fake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(),
 		map[schema.GroupVersionResource]string{
 			{Group: "apps", Version: "v1", Resource: "replicasets"}: "ReplicaSetList",
@@ -128,6 +138,8 @@ func setupFakeData(t *testing.T) (dynamicPkg.Interface, meta.RESTMapper, unstruc
 	mapping, err = restMapper.RESTMapping(gv.WithKind("Deployment").GroupKind())
 	assert.NoError(t, err)
 	_, err = dynamic.Resource(mapping.Resource).Namespace("test").Create(context.TODO(), &dep, metav1.CreateOptions{})
+	assert.NoError(t, err)
+	_, err = dynamic.Resource(mapping.Resource).Namespace("test").Create(context.TODO(), &depNoPods, metav1.CreateOptions{})
 	assert.NoError(t, err)
 	return dynamic, restMapper, pod, rs, dep, pod2
 }
@@ -151,8 +163,8 @@ func TestGetAllTopControllers(t *testing.T) {
 	dynamic, restMapper, _, _, _, _ := setupFakeData(t)
 	controllers, err := GetAllTopControllers(context.TODO(), dynamic, restMapper, "")
 	assert.NoError(t, err)
-	assert.Equal(t, 2, len(controllers))
+	assert.Equal(t, 3, len(controllers))
 	controllers, err = GetAllTopControllers(context.TODO(), dynamic, restMapper, "test")
 	assert.NoError(t, err)
-	assert.Equal(t, 1, len(controllers))
+	assert.Equal(t, 2, len(controllers))
 }
