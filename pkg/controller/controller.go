@@ -194,7 +194,7 @@ func GetTopController(ctx context.Context, dynamicClient dynamic.Interface, rest
 }
 
 func cacheAllObjectsOfKind(ctx context.Context, apiVersion, kind, namespace string, dynamicClient dynamic.Interface, restMapper meta.RESTMapper, objectCache map[string]unstructured.Unstructured) error {
-	fmt.Println("cache all", apiVersion, kind)
+	log.GetLogger().V(9).Info("cache all", apiVersion, kind)
 	fqKind := schema.FromAPIVersionAndKind(apiVersion, kind)
 	mapping, err := restMapper.RESTMapping(fqKind.GroupKind(), fqKind.Version)
 	if err != nil {
