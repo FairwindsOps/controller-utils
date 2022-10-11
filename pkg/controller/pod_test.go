@@ -19,23 +19,28 @@ import (
 	"io/ioutil"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
+
+
 	"github.com/stretchr/testify/assert"
 )
 
 func TestGetPodSpec(t *testing.T) {
-	podSpec := readPodSpecFile(t, "./tests/deployment.json")
+	podSpec, err := readPodSpecFile(t, "./tests/deployment.json")
+	assert.NoError(t, err)
 	assert.NotNil(t, podSpec)
-	assert.Equal(t, 1, len(podSpec.(map[string]interface{})["containers"].([]interface{})))
-	podSpec = readPodSpecFile(t, "./tests/secret.json")
+	assert.Equal(t, 1, len(podSpec.Containers))
+
+	podSpec, err = readPodSpecFile(t, "./tests/secret.json")
+	assert.Error(t, err)
 	assert.Nil(t, podSpec)
 }
 
-func readPodSpecFile(t *testing.T, file string) interface{} {
+func readPodSpecFile(t *testing.T, file string) (*corev1.PodSpec, error) {
 	contents, err := ioutil.ReadFile(file)
 	assert.NoError(t, err)
 	var object map[string]interface{}
 	err = json.Unmarshal(contents, &object)
 	assert.NoError(t, err)
 	return GetPodSpec(object)
-
 }

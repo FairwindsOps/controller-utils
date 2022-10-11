@@ -14,18 +14,31 @@
 
 package controller
 
+import (
+	"errors"
+	"encoding/json"
+
+	corev1 "k8s.io/api/core/v1"
+)
+
 var podSpecFields = []string{"jobTemplate", "spec", "template"}
 
 // GetPodSpec looks inside arbitrary YAML for a PodSpec
-func GetPodSpec(yaml map[string]interface{}) interface{} {
+func GetPodSpec(obj map[string]interface{}) (*corev1.PodSpec, error) {
 	// TODO examine this for ways to make it more efficient.
 	for _, child := range podSpecFields {
-		if childYaml, ok := yaml[child]; ok {
+		if childYaml, ok := obj[child]; ok {
 			return GetPodSpec(childYaml.(map[string]interface{}))
 		}
 	}
-	if _, ok := yaml["containers"]; ok {
-		return yaml
+	if _, ok := obj["containers"]; !ok {
+		return nil, errors.New("No podSpec found")
 	}
-	return nil
+	b, err := json.Marshal(obj)
+	if err != nil {
+		return nil, err
+	}
+	podSpec := corev1.PodSpec{}
+	err = json.Unmarshal(b, &podSpec)
+	return &podSpec, err
 }
