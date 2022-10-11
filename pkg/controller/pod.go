@@ -15,7 +15,6 @@
 package controller
 
 import (
-	"errors"
 	"encoding/json"
 
 	corev1 "k8s.io/api/core/v1"
@@ -32,7 +31,7 @@ func GetPodSpec(obj map[string]interface{}) (*corev1.PodSpec, error) {
 		}
 	}
 	if _, ok := obj["containers"]; !ok {
-		return nil, errors.New("No podSpec found")
+		return nil, nil
 	}
 	b, err := json.Marshal(obj)
 	if err != nil {

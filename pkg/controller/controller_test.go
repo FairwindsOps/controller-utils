@@ -165,10 +165,10 @@ func TestGetTopController(t *testing.T) {
 
 func TestGetAllTopControllers(t *testing.T) {
 	client, _, _, _, _ := setupFakeData(t)
-	controllers, err := client.GetAllTopControllers("")
+	controllers, err := client.GetAllTopControllersSummary("")
 	assert.NoError(t, err)
 	assert.Equal(t, 3, len(controllers))
-	controllers, err = client.GetAllTopControllers("test")
+	controllers, err = client.GetAllTopControllersSummary("test")
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(controllers))
 }

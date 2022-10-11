@@ -29,6 +29,8 @@ import (
 	"github.com/fairwindsops/controller-utils/pkg/log"
 )
 
+const podStatusRunning = "Running"
+
 type knownKind struct {
 	kind string
 	apiVersion string
@@ -52,7 +54,9 @@ var knownKinds = []knownKind{{
 type Workload struct {
 	TopController unstructured.Unstructured
 	Pods          []unstructured.Unstructured
-	PodSpec corev1.PodSpec
+	PodSpec *corev1.PodSpec
+	PodCount int
+	RunningPodCount int
 }
 
 type Client struct {
@@ -75,6 +79,20 @@ func (client Client) getAllPods(namespace string) ([]unstructured.Unstructured, 
 	return pods.Items, nil
 }
 
+func getPodStatus(unst unstructured.Unstructured) string {
+	obj := unst.UnstructuredContent()
+	if statusI, ok := obj["status"]; ok {
+		if status, ok := statusI.(map[string]interface{}); ok {
+			if phaseI, ok := status["phase"]; ok {
+				if phase, ok := phaseI.(string); ok {
+					return phase
+				}
+			}
+		}
+	}
+	return ""
+}
+
 func (client Client) prepCacheWithKnownControllers(namespace string, objectCache map[string]unstructured.Unstructured) error {
 	for _, kind := range knownKinds {
 		err := client.cacheAllObjectsOfKind(kind.apiVersion, kind.kind, namespace, objectCache, true)
@@ -85,8 +103,19 @@ func (client Client) prepCacheWithKnownControllers(namespace string, objectCache
 	return nil
 }
 
-// GetAllTopControllers returns the highest level owning object of all pods. If a namespace is provided than this is limited to that namespace.
-func (client Client) GetAllTopControllers(namespace string) ([]Workload, error) {
+// GetAllTopControllersSummary returns the highest level owning object of all pods, as well as all pods.
+// If a namespace is provided than this is limited to that namespace.
+// This can be more memory-efficient than GetAllTopControllersWithPods, since it does not include individual pods.
+func (client Client) GetAllTopControllersSummary(namespace string) ([]Workload, error) {
+	return client.getAllTopControllers(namespace, false)
+}
+
+// GetAllTopControllersWithPods returns the highest level owning object of all pods. If a namespace is provided than this is limited to that namespace.
+func (client Client) GetAllTopControllersWithPods(namespace string) ([]Workload, error) {
+	return client.getAllTopControllers(namespace, true)
+}
+
+func (client Client) getAllTopControllers(namespace string, includePods bool) ([]Workload, error) {
 	workloadMap := map[string]Workload{}
 	objectCache := map[string]unstructured.Unstructured{}
 	err := client.prepCacheWithKnownControllers(namespace, objectCache)
@@ -95,8 +124,13 @@ func (client Client) GetAllTopControllers(namespace string) ([]Workload, error) 
 	}
 	for _, controller := range objectCache {
 		key := getControllerKey(controller)
+		podSpec, err := GetPodSpec(controller.UnstructuredContent())
+		if err != nil {
+			return nil, err
+		}
 		workloadMap[key] = Workload{
 			TopController: controller,
+			PodSpec: podSpec,
 		}
 	}
 	pods, err := client.getAllPods(namespace)
@@ -114,35 +148,30 @@ func (client Client) GetAllTopControllers(namespace string) ([]Workload, error) 
 		existingWorkload, ok := workloadMap[key]
 		if !ok {
 			existingWorkload.TopController = controller
+			podSpec, err := GetPodSpec(controller.UnstructuredContent())
+			if err != nil {
+				return nil, err
+			}
+			if podSpec == nil {
+				podSpec, err = GetPodSpec(pod.UnstructuredContent())
+				if err != nil {
+					return nil, err
+				}
+			}
+			if err != nil {
+				existingWorkload.PodSpec = podSpec
+			}
 		}
-		existingWorkload.Pods = append(existingWorkload.Pods, pod)
+		existingWorkload.PodCount += 1
+		if getPodStatus(pod) == podStatusRunning {
+			existingWorkload.RunningPodCount += 1
+		}
+		if includePods {
+			existingWorkload.Pods = append(existingWorkload.Pods, pod)
+		}
 		workloadMap[key] = existingWorkload
 	}
 	workloads := make([]Workload, 0)
-	for _, workload := range workloadMap {
-		workloads = append(workloads, workload)
-	}
-	return workloads, nil
-}
-
-// GetAllTopControllersSummary returns the highest level owning object of all pods and all of the pods. If a namespace is provided than this is limited to that namespace.
-func (client Client) GetAllTopControllersSummary(namespace string) ([]unstructured.Unstructured, error) {
-	pods, err := client.getAllPods(namespace)
-	if err != nil {
-		return nil, err
-	}
-	workloadMap := map[string]unstructured.Unstructured{}
-	objectCache := map[string]unstructured.Unstructured{}
-	dedupedPods := dedupePods(pods)
-	for _, pod := range dedupedPods {
-		controller, err := client.GetTopController(pod, objectCache)
-		if err != nil {
-			// Do not return the error so that we can retrieve as many top level controllers as possible.
-			log.GetLogger().Error(err, "An error occured retrieving the top level controller for this pod", pod.GetName(), pod.GetNamespace())
-		}
-		workloadMap[getControllerKey(controller)] = controller
-	}
-	workloads := make([]unstructured.Unstructured, 0)
 	for _, workload := range workloadMap {
 		workloads = append(workloads, workload)
 	}

@@ -32,7 +32,7 @@ func TestGetPodSpec(t *testing.T) {
 	assert.Equal(t, 1, len(podSpec.Containers))
 
 	podSpec, err = readPodSpecFile(t, "./tests/secret.json")
-	assert.Error(t, err)
+	assert.NoError(t, err)
 	assert.Nil(t, podSpec)
 }
 
