@@ -19,8 +19,8 @@ import (
 	"errors"
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -32,7 +32,7 @@ import (
 const podStatusRunning = "Running"
 
 type knownKind struct {
-	kind string
+	kind       string
 	apiVersion string
 }
 
@@ -52,16 +52,16 @@ var knownKinds = []knownKind{{
 
 // Workload represents a workload in the cluster. It contains the top level object and all of the pods.
 type Workload struct {
-	TopController unstructured.Unstructured
-	Pods          []unstructured.Unstructured
-	PodSpec *corev1.PodSpec
-	PodCount int
+	TopController   unstructured.Unstructured
+	Pods            []unstructured.Unstructured
+	PodSpec         *corev1.PodSpec
+	PodCount        int
 	RunningPodCount int
 }
 
 type Client struct {
-	Context context.Context
-	Dynamic dynamic.Interface
+	Context    context.Context
+	Dynamic    dynamic.Interface
 	RESTMapper meta.RESTMapper
 }
 
@@ -130,7 +130,7 @@ func (client Client) getAllTopControllers(namespace string, includePods bool) ([
 		}
 		workloadMap[key] = Workload{
 			TopController: controller,
-			PodSpec: podSpec,
+			PodSpec:       podSpec,
 		}
 	}
 	pods, err := client.getAllPods(namespace)
