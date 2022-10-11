@@ -158,9 +158,7 @@ func (client Client) getAllTopControllers(namespace string, includePods bool) ([
 					return nil, err
 				}
 			}
-			if err != nil {
-				existingWorkload.PodSpec = podSpec
-			}
+			existingWorkload.PodSpec = podSpec
 		}
 		existingWorkload.PodCount += 1
 		if getPodStatus(pod) == podStatusRunning {
