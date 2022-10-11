@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -49,25 +50,32 @@ var knownKinds = []knownKind{{
 type Workload struct {
 	TopController unstructured.Unstructured
 	Pods          []unstructured.Unstructured
+	PodSpec corev1.PodSpec
 }
 
-func getAllPods(ctx context.Context, dynamicClient dynamic.Interface, restMapper meta.RESTMapper, namespace string) ([]unstructured.Unstructured, error) {
+type Client struct {
+	ctx context.Context
+	dynamic dynamic.Interface
+	restMapper meta.RESTMapper
+}
+
+func (client Client) getAllPods(namespace string) ([]unstructured.Unstructured, error) {
 	fqKind := schema.FromAPIVersionAndKind("v1", "Pod")
-	mapping, err := restMapper.RESTMapping(fqKind.GroupKind(), fqKind.Version)
+	mapping, err := client.restMapper.RESTMapping(fqKind.GroupKind(), fqKind.Version)
 	if err != nil {
 		log.GetLogger().Error(err, "Error retrieving mapping", "v1", "Pod")
 		return nil, err
 	}
-	pods, err := dynamicClient.Resource(mapping.Resource).Namespace(namespace).List(ctx, metav1.ListOptions{})
+	pods, err := client.dynamic.Resource(mapping.Resource).Namespace(namespace).List(client.ctx, metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
 	return pods.Items, nil
 }
 
-func prepCacheWithKnownControllers(ctx context.Context, dynamicClient dynamic.Interface, restMapper meta.RESTMapper, namespace string, objectCache map[string]unstructured.Unstructured) error {
+func (client Client) prepCacheWithKnownControllers(namespace string, objectCache map[string]unstructured.Unstructured) error {
 	for _, kind := range knownKinds {
-		err := cacheAllObjectsOfKind(ctx, kind.apiVersion, kind.kind, namespace, dynamicClient, restMapper, objectCache)
+		err := client.cacheAllObjectsOfKind(kind.apiVersion, kind.kind, namespace, objectCache)
 		if err != nil {
 			log.GetLogger().V(3).Info("Unable to prime cache with objects of kind " + kind.kind)
 		}
@@ -76,10 +84,10 @@ func prepCacheWithKnownControllers(ctx context.Context, dynamicClient dynamic.In
 }
 
 // GetAllTopControllers returns the highest level owning object of all pods. If a namespace is provided than this is limited to that namespace.
-func GetAllTopControllers(ctx context.Context, dynamicClient dynamic.Interface, restMapper meta.RESTMapper, namespace string) ([]Workload, error) {
+func (client Client) GetAllTopControllers(namespace string) ([]Workload, error) {
 	workloadMap := map[string]Workload{}
 	objectCache := map[string]unstructured.Unstructured{}
-	err := prepCacheWithKnownControllers(ctx, dynamicClient, restMapper, namespace, objectCache)
+	err := client.prepCacheWithKnownControllers(namespace, objectCache)
 	if err != nil {
 		return nil, err
 	}
@@ -89,13 +97,13 @@ func GetAllTopControllers(ctx context.Context, dynamicClient dynamic.Interface, 
 			TopController: controller,
 		}
 	}
-	pods, err := getAllPods(ctx, dynamicClient, restMapper, namespace)
+	pods, err := client.getAllPods(namespace)
 	if err != nil {
 		return nil, err
 	}
 	// TODO avoid cycling over multiple pods with the same parent
 	for _, pod := range pods {
-		controller, err := GetTopController(ctx, dynamicClient, restMapper, pod, objectCache)
+		controller, err := client.GetTopController(pod, objectCache)
 		if err != nil {
 			// Do not return the error so that we can retrieve as many top level controllers as possible.
 			log.GetLogger().Error(err, "An error occured retrieving the top level controller for this pod", pod.GetName(), pod.GetNamespace())
@@ -116,8 +124,8 @@ func GetAllTopControllers(ctx context.Context, dynamicClient dynamic.Interface, 
 }
 
 // GetAllTopControllersSummary returns the highest level owning object of all pods and all of the pods. If a namespace is provided than this is limited to that namespace.
-func GetAllTopControllersSummary(ctx context.Context, dynamicClient dynamic.Interface, restMapper meta.RESTMapper, namespace string) ([]unstructured.Unstructured, error) {
-	pods, err := getAllPods(ctx, dynamicClient, restMapper, namespace)
+func (client Client) GetAllTopControllersSummary(namespace string) ([]unstructured.Unstructured, error) {
+	pods, err := client.getAllPods(namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +133,7 @@ func GetAllTopControllersSummary(ctx context.Context, dynamicClient dynamic.Inte
 	objectCache := map[string]unstructured.Unstructured{}
 	dedupedPods := dedupePods(pods)
 	for _, pod := range dedupedPods {
-		controller, err := GetTopController(ctx, dynamicClient, restMapper, pod, objectCache)
+		controller, err := client.GetTopController(pod, objectCache)
 		if err != nil {
 			// Do not return the error so that we can retrieve as many top level controllers as possible.
 			log.GetLogger().Error(err, "An error occured retrieving the top level controller for this pod", pod.GetName(), pod.GetNamespace())
@@ -161,7 +169,7 @@ func dedupePods(pods []unstructured.Unstructured) []unstructured.Unstructured {
 }
 
 // GetTopController finds the highest level owner of whatever object is passed in.
-func GetTopController(ctx context.Context, dynamicClient dynamic.Interface, restMapper meta.RESTMapper, unstructuredObject unstructured.Unstructured, objectCache map[string]unstructured.Unstructured) (unstructured.Unstructured, error) {
+func (client Client) GetTopController(unstructuredObject unstructured.Unstructured, objectCache map[string]unstructured.Unstructured) (unstructured.Unstructured, error) {
 	owners := unstructuredObject.GetOwnerReferences()
 	if len(owners) > 0 {
 		if objectCache == nil {
@@ -179,7 +187,7 @@ func GetTopController(ctx context.Context, dynamicClient dynamic.Interface, rest
 		key := fmt.Sprintf("%s/%s/%s", firstOwner.Kind, unstructuredObject.GetNamespace(), firstOwner.Name)
 		abstractObject, ok := objectCache[key]
 		if !ok {
-			err := cacheAllObjectsOfKind(ctx, firstOwner.APIVersion, firstOwner.Kind, unstructuredObject.GetNamespace(), dynamicClient, restMapper, objectCache)
+			err := client.cacheAllObjectsOfKind(firstOwner.APIVersion, firstOwner.Kind, unstructuredObject.GetNamespace(), objectCache)
 			if err != nil {
 				return unstructuredObject, err
 			}
@@ -188,28 +196,27 @@ func GetTopController(ctx context.Context, dynamicClient dynamic.Interface, rest
 				return unstructuredObject, errors.New("this object could not be found for this object " + key)
 			}
 		}
-		return GetTopController(ctx, dynamicClient, restMapper, abstractObject, objectCache)
+		return client.GetTopController(abstractObject, objectCache)
 	}
 	return unstructuredObject, nil
 }
 
-func cacheAllObjectsOfKind(ctx context.Context, apiVersion, kind, namespace string, dynamicClient dynamic.Interface, restMapper meta.RESTMapper, objectCache map[string]unstructured.Unstructured) error {
+func (client Client) cacheAllObjectsOfKind(apiVersion, kind, namespace string, objectCache map[string]unstructured.Unstructured) error {
 	log.GetLogger().V(9).Info("cache all", apiVersion, kind)
 	fqKind := schema.FromAPIVersionAndKind(apiVersion, kind)
-	mapping, err := restMapper.RESTMapping(fqKind.GroupKind(), fqKind.Version)
+	mapping, err := client.restMapper.RESTMapping(fqKind.GroupKind(), fqKind.Version)
 	if err != nil {
 		log.GetLogger().Error(err, "Error retrieving mapping", apiVersion, kind)
 		return err
 	}
 
-	objects, err := dynamicClient.Resource(mapping.Resource).Namespace(namespace).List(ctx, metav1.ListOptions{})
+	objects, err := client.dynamic.Resource(mapping.Resource).Namespace(namespace).List(client.ctx, metav1.ListOptions{})
 	if err != nil {
 		log.GetLogger().Error(err, "Error retrieving parent object", mapping.Resource.Version, mapping.Resource.Resource)
 		return err
 	}
 	for idx, object := range objects.Items {
 		key := getControllerKey(object)
-
 		objectCache[key] = objects.Items[idx]
 	}
 	return nil

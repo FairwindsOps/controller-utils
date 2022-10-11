@@ -25,13 +25,12 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	dynamicPkg "k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/fake"
 
 	"github.com/fairwindsops/controller-utils/pkg/log"
 )
 
-func setupFakeData(t *testing.T) (dynamicPkg.Interface, meta.RESTMapper, unstructured.Unstructured, unstructured.Unstructured, unstructured.Unstructured, unstructured.Unstructured) {
+func setupFakeData(t *testing.T) (Client, unstructured.Unstructured, unstructured.Unstructured, unstructured.Unstructured, unstructured.Unstructured) {
 
 	// TODO move to a centralized place
 	log.SetLogger(testLog.NewTestLogger(t))
@@ -141,30 +140,35 @@ func setupFakeData(t *testing.T) (dynamicPkg.Interface, meta.RESTMapper, unstruc
 	assert.NoError(t, err)
 	_, err = dynamic.Resource(mapping.Resource).Namespace("test").Create(context.TODO(), &depNoPods, metav1.CreateOptions{})
 	assert.NoError(t, err)
-	return dynamic, restMapper, pod, rs, dep, pod2
+	client := Client{
+		dynamic: dynamic,
+		restMapper: restMapper,
+		ctx: context.TODO(),
+	}
+	return client, pod, rs, dep, pod2
 }
 
 func TestGetTopController(t *testing.T) {
-	dynamic, restMapper, pod, rs, dep, pod2 := setupFakeData(t)
-	controller, err := GetTopController(context.TODO(), dynamic, restMapper, pod, map[string]unstructured.Unstructured{})
+	client, pod, rs, dep, pod2 := setupFakeData(t)
+	controller, err := client.GetTopController(pod, map[string]unstructured.Unstructured{})
 	assert.NoError(t, err)
 	assert.Equal(t, "dep", controller.GetName())
-	controller, err = GetTopController(context.TODO(), dynamic, restMapper, rs, map[string]unstructured.Unstructured{})
+	controller, err = client.GetTopController(rs, map[string]unstructured.Unstructured{})
 	assert.NoError(t, err)
 	assert.Equal(t, "dep", controller.GetName())
-	controller, err = GetTopController(context.TODO(), dynamic, restMapper, dep, map[string]unstructured.Unstructured{})
+	controller, err = client.GetTopController(dep, map[string]unstructured.Unstructured{})
 	assert.NoError(t, err)
 	assert.Equal(t, "dep", controller.GetName())
-	controller, err = GetTopController(context.TODO(), dynamic, restMapper, pod2, map[string]unstructured.Unstructured{})
+	controller, err = client.GetTopController(pod2, map[string]unstructured.Unstructured{})
 	assert.Error(t, err)
 }
 
 func TestGetAllTopControllers(t *testing.T) {
-	dynamic, restMapper, _, _, _, _ := setupFakeData(t)
-	controllers, err := GetAllTopControllers(context.TODO(), dynamic, restMapper, "")
+	client, _, _, _, _ := setupFakeData(t)
+	controllers, err := client.GetAllTopControllers("")
 	assert.NoError(t, err)
 	assert.Equal(t, 3, len(controllers))
-	controllers, err = GetAllTopControllers(context.TODO(), dynamic, restMapper, "test")
+	controllers, err = client.GetAllTopControllers("test")
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(controllers))
 }
