@@ -60,19 +60,19 @@ type Workload struct {
 }
 
 type Client struct {
-	ctx context.Context
-	dynamic dynamic.Interface
-	restMapper meta.RESTMapper
+	Context context.Context
+	Dynamic dynamic.Interface
+	RESTMapper meta.RESTMapper
 }
 
 func (client Client) getAllPods(namespace string) ([]unstructured.Unstructured, error) {
 	fqKind := schema.FromAPIVersionAndKind("v1", "Pod")
-	mapping, err := client.restMapper.RESTMapping(fqKind.GroupKind(), fqKind.Version)
+	mapping, err := client.RESTMapper.RESTMapping(fqKind.GroupKind(), fqKind.Version)
 	if err != nil {
 		log.GetLogger().Error(err, "Error retrieving mapping", "v1", "Pod")
 		return nil, err
 	}
-	pods, err := client.dynamic.Resource(mapping.Resource).Namespace(namespace).List(client.ctx, metav1.ListOptions{})
+	pods, err := client.Dynamic.Resource(mapping.Resource).Namespace(namespace).List(client.Context, metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -235,13 +235,13 @@ func (client Client) GetTopController(unstructuredObject unstructured.Unstructur
 func (client Client) cacheAllObjectsOfKind(apiVersion, kind, namespace string, objectCache map[string]unstructured.Unstructured, mustNotHaveOwner bool) error {
 	log.GetLogger().V(9).Info("cache all", apiVersion, kind)
 	fqKind := schema.FromAPIVersionAndKind(apiVersion, kind)
-	mapping, err := client.restMapper.RESTMapping(fqKind.GroupKind(), fqKind.Version)
+	mapping, err := client.RESTMapper.RESTMapping(fqKind.GroupKind(), fqKind.Version)
 	if err != nil {
 		log.GetLogger().Error(err, "Error retrieving mapping", apiVersion, kind)
 		return err
 	}
 
-	objects, err := client.dynamic.Resource(mapping.Resource).Namespace(namespace).List(client.ctx, metav1.ListOptions{})
+	objects, err := client.Dynamic.Resource(mapping.Resource).Namespace(namespace).List(client.Context, metav1.ListOptions{})
 	if err != nil {
 		log.GetLogger().Error(err, "Error retrieving parent object", mapping.Resource.Version, mapping.Resource.Resource)
 		return err

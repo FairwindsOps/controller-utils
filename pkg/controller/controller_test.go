@@ -141,9 +141,9 @@ func setupFakeData(t *testing.T) (Client, unstructured.Unstructured, unstructure
 	_, err = dynamic.Resource(mapping.Resource).Namespace("test").Create(context.TODO(), &depNoPods, metav1.CreateOptions{})
 	assert.NoError(t, err)
 	client := Client{
-		dynamic: dynamic,
-		restMapper: restMapper,
-		ctx: context.TODO(),
+		Dynamic: dynamic,
+		RESTMapper: restMapper,
+		Context: context.TODO(),
 	}
 	return client, pod, rs, dep, pod2
 }
