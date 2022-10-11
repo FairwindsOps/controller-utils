@@ -59,6 +59,7 @@ type Workload struct {
 	RunningPodCount int
 }
 
+// Client is used to interact with the Kubernetes API
 type Client struct {
 	Context    context.Context
 	Dynamic    dynamic.Interface
@@ -160,9 +161,9 @@ func (client Client) getAllTopControllers(namespace string, includePods bool) ([
 			}
 			existingWorkload.PodSpec = podSpec
 		}
-		existingWorkload.PodCount += 1
+		existingWorkload.PodCount++
 		if getPodStatus(pod) == podStatusRunning {
-			existingWorkload.RunningPodCount += 1
+			existingWorkload.RunningPodCount++
 		}
 		if includePods {
 			existingWorkload.Pods = append(existingWorkload.Pods, pod)
