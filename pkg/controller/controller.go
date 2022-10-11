@@ -37,6 +37,8 @@ type knownKind struct {
 var knownKinds = []knownKind{{
 	"Deployment", "apps/v1",
 }, {
+	"ReplicaSet", "apps/v1",
+}, {
 	"CronJob", "batch/v1",
 }, {
 	"Job", "batch/v1",
@@ -75,7 +77,7 @@ func (client Client) getAllPods(namespace string) ([]unstructured.Unstructured, 
 
 func (client Client) prepCacheWithKnownControllers(namespace string, objectCache map[string]unstructured.Unstructured) error {
 	for _, kind := range knownKinds {
-		err := client.cacheAllObjectsOfKind(kind.apiVersion, kind.kind, namespace, objectCache)
+		err := client.cacheAllObjectsOfKind(kind.apiVersion, kind.kind, namespace, objectCache, true)
 		if err != nil {
 			log.GetLogger().V(3).Info("Unable to prime cache with objects of kind " + kind.kind)
 		}
@@ -187,7 +189,7 @@ func (client Client) GetTopController(unstructuredObject unstructured.Unstructur
 		key := fmt.Sprintf("%s/%s/%s", firstOwner.Kind, unstructuredObject.GetNamespace(), firstOwner.Name)
 		abstractObject, ok := objectCache[key]
 		if !ok {
-			err := client.cacheAllObjectsOfKind(firstOwner.APIVersion, firstOwner.Kind, unstructuredObject.GetNamespace(), objectCache)
+			err := client.cacheAllObjectsOfKind(firstOwner.APIVersion, firstOwner.Kind, unstructuredObject.GetNamespace(), objectCache, false)
 			if err != nil {
 				return unstructuredObject, err
 			}
@@ -201,7 +203,7 @@ func (client Client) GetTopController(unstructuredObject unstructured.Unstructur
 	return unstructuredObject, nil
 }
 
-func (client Client) cacheAllObjectsOfKind(apiVersion, kind, namespace string, objectCache map[string]unstructured.Unstructured) error {
+func (client Client) cacheAllObjectsOfKind(apiVersion, kind, namespace string, objectCache map[string]unstructured.Unstructured, mustNotHaveOwner bool) error {
 	log.GetLogger().V(9).Info("cache all", apiVersion, kind)
 	fqKind := schema.FromAPIVersionAndKind(apiVersion, kind)
 	mapping, err := client.restMapper.RESTMapping(fqKind.GroupKind(), fqKind.Version)
@@ -216,6 +218,9 @@ func (client Client) cacheAllObjectsOfKind(apiVersion, kind, namespace string, o
 		return err
 	}
 	for idx, object := range objects.Items {
+		if mustNotHaveOwner && len(object.GetOwnerReferences()) > 0 {
+			continue
+		}
 		key := getControllerKey(object)
 		objectCache[key] = objects.Items[idx]
 	}
