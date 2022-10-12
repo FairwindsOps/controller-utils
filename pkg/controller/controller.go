@@ -104,14 +104,15 @@ func (client Client) prepCacheWithKnownControllers(namespace string, objectCache
 	return nil
 }
 
-// GetAllTopControllersSummary returns the highest level owning object of all pods, as well as all pods.
+// GetAllTopControllersSummary returns the highest level owning object of all pods
 // If a namespace is provided than this is limited to that namespace.
 // This can be more memory-efficient than GetAllTopControllersWithPods, since it does not include individual pods.
 func (client Client) GetAllTopControllersSummary(namespace string) ([]Workload, error) {
 	return client.getAllTopControllers(namespace, false)
 }
 
-// GetAllTopControllersWithPods returns the highest level owning object of all pods. If a namespace is provided than this is limited to that namespace.
+// GetAllTopControllersWithPods returns the highest level owning object of all pods, as well as all pods.
+// If a namespace is provided than this is limited to that namespace.
 func (client Client) GetAllTopControllersWithPods(namespace string) ([]Workload, error) {
 	return client.getAllTopControllers(namespace, true)
 }
@@ -231,7 +232,7 @@ func (client Client) GetTopController(unstructuredObject unstructured.Unstructur
 	return unstructuredObject, nil
 }
 
-func (client Client) cacheAllObjectsOfKind(apiVersion, kind, namespace string, objectCache map[string]unstructured.Unstructured, mustNotHaveOwner bool) error {
+func (client Client) cacheAllObjectsOfKind(apiVersion, kind, namespace string, objectCache map[string]unstructured.Unstructured, mustBeTopLevel bool) error {
 	log.GetLogger().V(9).Info("cache all", apiVersion, kind)
 	fqKind := schema.FromAPIVersionAndKind(apiVersion, kind)
 	mapping, err := client.RESTMapper.RESTMapping(fqKind.GroupKind(), fqKind.Version)
@@ -246,7 +247,7 @@ func (client Client) cacheAllObjectsOfKind(apiVersion, kind, namespace string, o
 		return err
 	}
 	for idx, object := range objects.Items {
-		if mustNotHaveOwner && len(object.GetOwnerReferences()) > 0 {
+		if mustBeTopLevel && len(object.GetOwnerReferences()) > 0 {
 			continue
 		}
 		key := getControllerKey(object)
