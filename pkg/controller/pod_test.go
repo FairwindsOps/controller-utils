@@ -16,7 +16,7 @@ package controller
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"os"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -36,7 +36,7 @@ func TestGetPodSpec(t *testing.T) {
 }
 
 func readPodSpecFile(t *testing.T, file string) (*corev1.PodSpec, error) {
-	contents, err := ioutil.ReadFile(file)
+	contents, err := os.ReadFile(file)
 	assert.NoError(t, err)
 	var object map[string]interface{}
 	err = json.Unmarshal(contents, &object)
