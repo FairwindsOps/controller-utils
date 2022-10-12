@@ -1,10 +1,11 @@
 module github.com/fairwindsops/controller-utils
 
-go 1.17
+go 1.19
 
 require (
 	github.com/go-logr/logr v1.2.3
 	github.com/stretchr/testify v1.7.2
+	k8s.io/api v0.23.5
 	k8s.io/apimachinery v0.23.5
 	k8s.io/client-go v0.23.5
 )
