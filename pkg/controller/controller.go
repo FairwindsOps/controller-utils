@@ -182,23 +182,6 @@ func getControllerKey(controller unstructured.Unstructured) string {
 	return fmt.Sprintf("%s/%s/%s", controller.GetKind(), controller.GetNamespace(), controller.GetName())
 }
 
-func dedupePods(pods []unstructured.Unstructured) []unstructured.Unstructured {
-	var dedupedPods []unstructured.Unstructured
-	dedupeMap := map[string]unstructured.Unstructured{}
-	for _, pod := range pods {
-		owners := pod.GetOwnerReferences()
-		if len(owners) == 0 {
-			dedupedPods = append(dedupedPods, pod)
-			continue
-		}
-		dedupeMap[fmt.Sprintf("%s/%s/%s", pod.GetNamespace(), owners[0].Kind, owners[0].Name)] = pod
-	}
-	for _, pod := range dedupeMap {
-		dedupedPods = append(dedupedPods, pod)
-	}
-	return dedupedPods
-}
-
 // GetTopController finds the highest level owner of whatever object is passed in.
 func (client Client) GetTopController(unstructuredObject unstructured.Unstructured, objectCache map[string]unstructured.Unstructured) (unstructured.Unstructured, error) {
 	owners := unstructuredObject.GetOwnerReferences()
