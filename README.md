@@ -7,6 +7,74 @@ This is a library of Go functions to assist in building Kubernetes Controllers.
 
 The `pkg/controller` package contains the main functionality. `pkg/log` contains helpers around logging. You can pass in a [logr](https://github.com/go-logr/logr) object to control the logs of this library.
 
+## Basic Usage
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/restmapper"
+	ctrl "sigs.k8s.io/controller-runtime"
+
+	"github.com/fairwindsops/controller-utils/pkg/controller"
+)
+
+func main() {
+	dynamic, restMapper, err := getKubeClient()
+	if err != nil {
+		panic(err)
+	}
+	client := controller.Client{
+		Context:    context.TODO(),
+		Dynamic:    dynamic,
+		RESTMapper: restMapper,
+	}
+	workloads, err := client.GetAllTopControllersSummary("")
+	if err != nil {
+		panic(err)
+	}
+	for _, workload := range workloads {
+		ctrl := workload.TopController
+		fmt.Println()
+		fmt.Printf("Workload: %s/%s/%s\n", ctrl.GetKind(), ctrl.GetNamespace(), ctrl.GetName())
+		fmt.Printf("  num pods: %d\n", workload.PodCount)
+		fmt.Printf("  running: %d\n", workload.RunningPodCount)
+		fmt.Printf("  podSpec: %#v\n", workload.PodSpec)
+	}
+}
+
+func getKubeClient() (dynamic.Interface, meta.RESTMapper, error) {
+	var restMapper meta.RESTMapper
+	var dynamicClient dynamic.Interface
+	kubeConf, configError := ctrl.GetConfig()
+	if configError != nil {
+		return dynamicClient, restMapper, configError
+	}
+
+	api, err := kubernetes.NewForConfig(kubeConf)
+	if err != nil {
+		return dynamicClient, restMapper, err
+	}
+
+	dynamicClient, err = dynamic.NewForConfig(kubeConf)
+	if err != nil {
+		return dynamicClient, restMapper, err
+	}
+
+	resources, err := restmapper.GetAPIGroupResources(api.Discovery())
+	if err != nil {
+		return dynamicClient, restMapper, err
+	}
+	restMapper = restmapper.NewDiscoveryRESTMapper(resources)
+	return dynamicClient, restMapper, nil
+}
+```
+
 <!-- Begin boilerplate -->
 ## Join the Fairwinds Open Source Community
 
