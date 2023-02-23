@@ -15,17 +15,33 @@
 package log
 
 import (
+	"log"
+	"os"
+	"strconv"
+
 	"github.com/go-logr/logr"
+	"github.com/go-logr/stdr"
 )
 
-var log logr.Logger = logr.Discard()
+var logger logr.Logger = logr.Discard()
+
+func init() {
+	if os.Getenv("CONTROLLER_UTILS_LOG_LEVEL") != "" {
+		logLevel, err := strconv.Atoi(os.Getenv("CONTROLLER_UTILS_LOG_LEVEL"))
+		if err != nil {
+			panic(err)
+		}
+		stdr.SetVerbosity(logLevel)
+		SetLogger(stdr.New(log.New(os.Stdout, "", 0)))
+	}
+}
 
 // SetLogger sets the logger to be used for this library.
 func SetLogger(l logr.Logger) {
-	log = l
+	logger = l
 }
 
 // GetLogger returns the logger object.
 func GetLogger() logr.Logger {
-	return log
+	return logger
 }
