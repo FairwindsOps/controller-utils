@@ -19,6 +19,7 @@ import (
 	"os"
 
 	"github.com/go-logr/logr"
+	"github.com/go-logr/logr/stdr"
 )
 
 var log logr.Logger = logr.Discard()
