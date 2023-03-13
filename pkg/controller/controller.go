@@ -117,6 +117,21 @@ func (client Client) GetAllTopControllersWithPods(namespace string) ([]Workload,
 	return client.getAllTopControllers(namespace, true)
 }
 
+// GetAllPersistentVolumeClaims returns all PVCs as unstructured objects.
+func (client Client) GetAllPersistentVolumeClaims(namespace string) ([]unstructured.Unstructured, error) {
+	fqKind := schema.FromAPIVersionAndKind("v1", "PersistentVolumeClaim")
+	mapping, err := client.RESTMapper.RESTMapping(fqKind.GroupKind(), fqKind.Version)
+	if err != nil {
+		log.GetLogger().Error(err, "Error retrieving mapping", "v1", "PersistentVolumeClaim")
+		return nil, err
+	}
+	PVCs, err := client.Dynamic.Resource(mapping.Resource).Namespace(namespace).List(client.Context, metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	return PVCs.Items, nil
+}
+
 func (client Client) getAllTopControllers(namespace string, includePods bool) ([]Workload, error) {
 	workloadMap := map[string]Workload{}
 	objectCache := map[string]unstructured.Unstructured{}
