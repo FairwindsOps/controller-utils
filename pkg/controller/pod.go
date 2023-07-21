@@ -23,7 +23,7 @@ import (
 
 var podSpecFields = []string{"jobTemplate", "spec", "template"}
 
-// GetPodSpec looks inside arbitrary YAML for a PodSpec
+// GetPodMetadataAndSpec looks inside arbitrary YAML for a PodSpec and it's metadata
 func GetPodMetadataAndSpec(obj map[string]any) (*metav1.ObjectMeta, *corev1.PodSpec, error) {
 	return getPodMetadataAndSpecRecursively(nil, obj)
 }
@@ -42,12 +42,13 @@ func getPodMetadataAndSpecRecursively(parent map[string]any, obj map[string]any)
 	if err != nil {
 		return nil, nil, err
 	}
+	// pod spec found,
 	var podSpec corev1.PodSpec
 	err = json.Unmarshal(b, &podSpec)
 	if err != nil {
 		return nil, nil, err
 	}
-	// pod spec found, looking for additional metadata
+	// looks for its metadata
 	metadata, err := getMetadata(parent)
 	if err != nil {
 		return nil, nil, err
