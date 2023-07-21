@@ -19,27 +19,62 @@ import (
 	"os"
 	"testing"
 
-	corev1 "k8s.io/api/core/v1"
-
 	"github.com/stretchr/testify/assert"
 )
 
 func TestGetPodSpec(t *testing.T) {
-	podSpec, err := readPodSpecFile(t, "./tests/deployment.json")
+	podMetadata, podSpec, err := GetPodMetadataAndSpec(readFile(t, "./testdata/secret.json"))
+	assert.NoError(t, err)
+	assert.Nil(t, podMetadata)
+	assert.Nil(t, podSpec)
+
+	podMetadata, podSpec, err = GetPodMetadataAndSpec(readFile(t, "./testdata/deployment.json"))
+	assert.NoError(t, err)
+	assert.NotNil(t, podSpec)
+	assert.Equal(t, 2, len(podMetadata.Labels))
+	assert.Equal(t, 1, len(podSpec.Containers))
+
+	podMetadata, podSpec, err = GetPodMetadataAndSpec(readFile(t, "./testdata/cronjob.json"))
+	assert.NoError(t, err)
+	assert.NotNil(t, podSpec)
+	assert.Nil(t, podMetadata)
+	assert.Equal(t, 1, len(podSpec.Containers))
+
+	podMetadata, podSpec, err = GetPodMetadataAndSpec(readFile(t, "./testdata/daemon-set.json"))
+	assert.NoError(t, err)
+	assert.NotNil(t, podSpec)
+	assert.Equal(t, 1, len(podMetadata.Labels))
+	assert.Equal(t, 1, len(podSpec.Containers))
+
+	podMetadata, podSpec, err = GetPodMetadataAndSpec(readFile(t, "./testdata/job.json"))
 	assert.NoError(t, err)
 	assert.NotNil(t, podSpec)
 	assert.Equal(t, 1, len(podSpec.Containers))
 
-	podSpec, err = readPodSpecFile(t, "./tests/secret.json")
+	podMetadata, podSpec, err = GetPodMetadataAndSpec(readFile(t, "./testdata/replica-set.json"))
 	assert.NoError(t, err)
-	assert.Nil(t, podSpec)
+	assert.NotNil(t, podSpec)
+	assert.Equal(t, 1, len(podMetadata.Labels))
+	assert.Equal(t, 1, len(podSpec.Containers))
+
+	podMetadata, podSpec, err = GetPodMetadataAndSpec(readFile(t, "./testdata/replication-controller.json"))
+	assert.NoError(t, err)
+	assert.NotNil(t, podSpec)
+	assert.Equal(t, 1, len(podMetadata.Labels))
+	assert.Equal(t, 1, len(podSpec.Containers))
+
+	podMetadata, podSpec, err = GetPodMetadataAndSpec(readFile(t, "./testdata/stateful-set.json"))
+	assert.NoError(t, err)
+	assert.NotNil(t, podSpec)
+	assert.Equal(t, 1, len(podMetadata.Labels))
+	assert.Equal(t, 1, len(podSpec.Containers))
 }
 
-func readPodSpecFile(t *testing.T, file string) (*corev1.PodSpec, error) {
+func readFile(t *testing.T, file string) map[string]any {
 	contents, err := os.ReadFile(file)
 	assert.NoError(t, err)
-	var object map[string]interface{}
+	var object map[string]any
 	err = json.Unmarshal(contents, &object)
 	assert.NoError(t, err)
-	return GetPodSpec(object)
+	return object
 }

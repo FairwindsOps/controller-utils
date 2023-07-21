@@ -55,6 +55,7 @@ type Workload struct {
 	TopController   unstructured.Unstructured
 	Pods            []unstructured.Unstructured
 	PodSpec         *corev1.PodSpec
+	PodMetadata     *metav1.ObjectMeta
 	PodCount        int
 	RunningPodCount int
 }
@@ -141,13 +142,14 @@ func (client Client) getAllTopControllers(namespace string, includePods bool) ([
 	}
 	for _, controller := range objectCache {
 		key := getControllerKey(controller)
-		podSpec, err := GetPodSpec(controller.UnstructuredContent())
+		podMetadata, podSpec, err := GetPodMetadataAndSpec(controller.UnstructuredContent())
 		if err != nil {
 			return nil, err
 		}
 		workloadMap[key] = Workload{
 			TopController: controller,
 			PodSpec:       podSpec,
+			PodMetadata:   podMetadata,
 		}
 	}
 	pods, err := client.getAllPods(namespace)
@@ -165,17 +167,18 @@ func (client Client) getAllTopControllers(namespace string, includePods bool) ([
 		existingWorkload, ok := workloadMap[key]
 		if !ok {
 			existingWorkload.TopController = controller
-			podSpec, err := GetPodSpec(controller.UnstructuredContent())
+			podMetadata, podSpec, err := GetPodMetadataAndSpec(controller.UnstructuredContent())
 			if err != nil {
 				return nil, err
 			}
 			if podSpec == nil {
-				podSpec, err = GetPodSpec(pod.UnstructuredContent())
+				podMetadata, podSpec, err = GetPodMetadataAndSpec(pod.UnstructuredContent())
 				if err != nil {
 					return nil, err
 				}
 			}
 			existingWorkload.PodSpec = podSpec
+			existingWorkload.PodMetadata = podMetadata
 		}
 		existingWorkload.PodCount++
 		if getPodStatus(pod) == podStatusRunning {

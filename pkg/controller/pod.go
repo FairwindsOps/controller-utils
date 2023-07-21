@@ -18,26 +18,55 @@ import (
 	"encoding/json"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var podSpecFields = []string{"jobTemplate", "spec", "template"}
 
 // GetPodSpec looks inside arbitrary YAML for a PodSpec
-func GetPodSpec(obj map[string]interface{}) (*corev1.PodSpec, error) {
+func GetPodMetadataAndSpec(obj map[string]any) (*metav1.ObjectMeta, *corev1.PodSpec, error) {
+	return getPodMetadataAndSpecRecursively(nil, obj)
+}
+
+func getPodMetadataAndSpecRecursively(parent map[string]any, obj map[string]any) (*metav1.ObjectMeta, *corev1.PodSpec, error) {
 	// TODO examine this for ways to make it more efficient.
 	for _, child := range podSpecFields {
 		if childYaml, ok := obj[child]; ok {
-			return GetPodSpec(childYaml.(map[string]interface{}))
+			return getPodMetadataAndSpecRecursively(obj, childYaml.(map[string]any))
 		}
 	}
 	if _, ok := obj["containers"]; !ok {
-		return nil, nil
+		return nil, nil, nil
 	}
 	b, err := json.Marshal(obj)
 	if err != nil {
+		return nil, nil, err
+	}
+	var podSpec corev1.PodSpec
+	err = json.Unmarshal(b, &podSpec)
+	if err != nil {
+		return nil, nil, err
+	}
+	// pod spec found, looking for additional metadata
+	metadata, err := getMetadata(parent)
+	if err != nil {
+		return nil, nil, err
+	}
+	return metadata, &podSpec, nil
+}
+
+func getMetadata(parent map[string]any) (*metav1.ObjectMeta, error) {
+	if parent == nil {
+		return nil, nil
+	}
+	if _, ok := parent["metadata"]; !ok {
+		return nil, nil
+	}
+	b, err := json.Marshal(parent["metadata"])
+	if err != nil {
 		return nil, err
 	}
-	podSpec := corev1.PodSpec{}
-	err = json.Unmarshal(b, &podSpec)
-	return &podSpec, err
+	var metadata metav1.ObjectMeta
+	err = json.Unmarshal(b, &metadata)
+	return &metadata, err
 }
