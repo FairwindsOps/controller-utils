@@ -49,6 +49,7 @@ func TestGetPodSpec(t *testing.T) {
 	podMetadata, podSpec, err = GetPodMetadataAndSpec(readFile(t, "./testdata/job.json"))
 	assert.NoError(t, err)
 	assert.NotNil(t, podSpec)
+	assert.Nil(t, podMetadata)
 	assert.Equal(t, 1, len(podSpec.Containers))
 
 	podMetadata, podSpec, err = GetPodMetadataAndSpec(readFile(t, "./testdata/replica-set.json"))
