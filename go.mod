@@ -3,7 +3,7 @@ module github.com/fairwindsops/controller-utils
 go 1.19
 
 require (
-	github.com/go-logr/logr v1.2.4
+	github.com/go-logr/logr v1.3.0
 	github.com/go-logr/stdr v1.2.2
 	github.com/stretchr/testify v1.8.4
 	k8s.io/api v0.28.2
