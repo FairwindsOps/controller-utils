@@ -138,7 +138,7 @@ func validateSecurityContext(childContainers, controllerContainers []any) error 
 	for _, container := range childContainers {
 		jsonSecurityContext, err := json.Marshal(container.(map[string]any)["securityContext"])
 		if err != nil {
-			log.GetLogger().Error(err, "Error marshaling securityContext")
+			log.GetLogger().Error(err, "Error marshaling child securityContext")
 			return err
 		}
 		childContainerSecurityContext[getContainerKey(container.(map[string]any))] = string(jsonSecurityContext)
@@ -147,7 +147,7 @@ func validateSecurityContext(childContainers, controllerContainers []any) error 
 	for _, container := range controllerContainers {
 		jsonSecurityContext, err := json.Marshal(container.(map[string]any)["securityContext"])
 		if err != nil {
-			log.GetLogger().Error(err, "Error marshaling securityContext")
+			log.GetLogger().Error(err, "Error marshaling controller securityContext")
 			return err
 		}
 		controllerContainersSecurityContext[getContainerKey(container.(map[string]any))] = string(jsonSecurityContext)
@@ -156,7 +156,7 @@ func validateSecurityContext(childContainers, controllerContainers []any) error 
 		controllerSecurityContext := controllerContainersSecurityContext[key]
 		if childContainerSecurityContext != controllerSecurityContext {
 			log.GetLogger().Info("child container key: %s", key)
-			log.GetLogger().Info("child      container securityContext: ", childContainerSecurityContext)
+			log.GetLogger().Info("child container securityContext: ", childContainerSecurityContext)
 			log.GetLogger().Info("controller container securityContext: ", controllerSecurityContext)
 			return fmt.Errorf("controller does not match child containers securityContext")
 		}
