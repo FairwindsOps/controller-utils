@@ -75,6 +75,7 @@ func getMetadata(parent map[string]any) (*metav1.ObjectMeta, error) {
 	return &metadata, err
 }
 
+// ValidateIfControllerMatches checks if a child object is controlled by a parent object
 func ValidateIfControllerMatches(child map[string]any, controller map[string]any) error {
 	if child["metadata"].(map[string]any)["ownerReferences"].([]any)[0].(map[string]any)["uid"] != controller["metadata"].(map[string]any)["uid"] {
 		return fmt.Errorf("controller does not match ownerReference uid")
@@ -116,7 +117,6 @@ func getChildContainers(child map[string]any) []any {
 func getControllerContainers(controller map[string]any) []any {
 	if _, ok := controller["spec"].(map[string]any)["jobTemplate"]; ok {
 		return controller["spec"].(map[string]any)["jobTemplate"].(map[string]any)["spec"].(map[string]any)["template"].(map[string]any)["spec"].(map[string]any)["containers"].([]any)
-	} else {
-		return controller["spec"].(map[string]any)["template"].(map[string]any)["spec"].(map[string]any)["containers"].([]any)
 	}
+	return controller["spec"].(map[string]any)["template"].(map[string]any)["spec"].(map[string]any)["containers"].([]any)
 }
