@@ -81,7 +81,6 @@ func readFile(t *testing.T, file string) map[string]any {
 }
 
 func TestValidateIfControllerMatches(t *testing.T) {
-	// Test that a child object is controlled by a parent object
 	err := ValidateIfControllerMatches(readFile(t, "./testdata/pod1.json"), readFile(t, "./testdata/controller1.json"))
 	assert.NoError(t, err)
 	err = ValidateIfControllerMatches(readFile(t, "./testdata/pod2.json"), readFile(t, "./testdata/controller1.json"))

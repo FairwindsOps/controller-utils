@@ -17,8 +17,8 @@ package controller
 import (
 	"encoding/json"
 	"fmt"
-	"reflect"
 
+	"github.com/fairwindsops/controller-utils/pkg/log"
 	"github.com/samber/lo"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -106,16 +106,28 @@ func ValidateIfControllerMatches(child map[string]any, controller map[string]any
 			return fmt.Errorf("controller does not match child containers names")
 		}
 	}
-	childContainerSecurityContext := map[string]any{}
+	childContainerSecurityContext := map[string]string{}
 	lo.ForEach(childContainers, func(container any, _ int) {
-		childContainerSecurityContext[getContainerKey(container.(map[string]any))] = container.(map[string]any)["securityContext"]
+		jsonSecurityContext, err := json.Marshal(container.(map[string]any)["securityContext"])
+		if err != nil {
+			log.GetLogger().Error(err, "Error marshaling securityContext")
+		}
+		childContainerSecurityContext[getContainerKey(container.(map[string]any))] = string(jsonSecurityContext)
 	})
-	controllerContainersSecurityContext := map[string]any{}
+	controllerContainersSecurityContext := map[string]string{}
 	lo.ForEach(controllerContainers, func(container any, _ int) {
-		controllerContainersSecurityContext[getContainerKey(container.(map[string]any))] = container.(map[string]any)["securityContext"]
+		jsonSecurityContext, err := json.Marshal(container.(map[string]any)["securityContext"])
+		if err != nil {
+			log.GetLogger().Error(err, "Error marshaling securityContext")
+		}
+		controllerContainersSecurityContext[getContainerKey(container.(map[string]any))] = string(jsonSecurityContext)
 	})
 	for key, childContainerSecurityContext := range childContainerSecurityContext {
-		if !reflect.DeepEqual(childContainerSecurityContext, controllerContainersSecurityContext[key]) {
+		controllerSecurityContext := controllerContainersSecurityContext[key]
+		if childContainerSecurityContext != controllerSecurityContext {
+			log.GetLogger().Info("child container key: ", key)
+			log.GetLogger().Info("child      container securityContext: ", childContainerSecurityContext)
+			log.GetLogger().Info("controller container securityContext: ", controller)
 			return fmt.Errorf("controller does not match child containers securityContext")
 		}
 	}
