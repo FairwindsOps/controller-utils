@@ -116,8 +116,6 @@ func ValidateIfControllerMatches(child map[string]any, controller map[string]any
 	})
 	for key, childContainerSecurityContext := range childContainerSecurityContext {
 		if !reflect.DeepEqual(childContainerSecurityContext, controllerContainersSecurityContext[key]) {
-			fmt.Println("X=====", childContainerSecurityContext)
-			fmt.Println("Y=====", controllerContainersSecurityContext[key])
 			return fmt.Errorf("controller does not match child containers securityContext")
 		}
 	}
