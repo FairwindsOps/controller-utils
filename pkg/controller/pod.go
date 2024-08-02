@@ -135,21 +135,23 @@ func getControllerContainers(controller map[string]any) []any {
 
 func validateSecurityContext(childContainers, controllerContainers []any) error {
 	childContainerSecurityContext := map[string]string{}
-	lo.ForEach(childContainers, func(container any, _ int) {
+	for _, container := range childContainers {
 		jsonSecurityContext, err := json.Marshal(container.(map[string]any)["securityContext"])
 		if err != nil {
 			log.GetLogger().Error(err, "Error marshaling securityContext")
+			return err
 		}
 		childContainerSecurityContext[getContainerKey(container.(map[string]any))] = string(jsonSecurityContext)
-	})
+	}
 	controllerContainersSecurityContext := map[string]string{}
-	lo.ForEach(controllerContainers, func(container any, _ int) {
+	for _, container := range controllerContainers {
 		jsonSecurityContext, err := json.Marshal(container.(map[string]any)["securityContext"])
 		if err != nil {
 			log.GetLogger().Error(err, "Error marshaling securityContext")
+			return err
 		}
 		controllerContainersSecurityContext[getContainerKey(container.(map[string]any))] = string(jsonSecurityContext)
-	})
+	}
 	for key, childContainerSecurityContext := range childContainerSecurityContext {
 		controllerSecurityContext := controllerContainersSecurityContext[key]
 		if childContainerSecurityContext != controllerSecurityContext {
