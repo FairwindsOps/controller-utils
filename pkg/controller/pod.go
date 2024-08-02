@@ -17,6 +17,7 @@ package controller
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 
 	"github.com/samber/lo"
 	corev1 "k8s.io/api/core/v1"
@@ -83,26 +84,48 @@ func ValidateIfControllerMatches(child map[string]any, controller map[string]any
 	if child["metadata"].(map[string]any)["namespace"].(string) != controller["metadata"].(map[string]any)["namespace"].(string) {
 		return fmt.Errorf("controller namespace %s does not match ownerReference namespace %s", controller["metadata"].(map[string]any)["namespace"], child["metadata"].(map[string]any)["ownerReferences"].([]any)[0].(map[string]any)["namespace"])
 	}
+	if child["metadata"].(map[string]any)["ownerReferences"].([]any)[0].(map[string]any)["name"].(string) != controller["metadata"].(map[string]any)["name"].(string) {
+		return fmt.Errorf("controller name %s does not match ownerReference name %s", controller["metadata"].(map[string]any)["name"], child["metadata"].(map[string]any)["ownerReferences"].([]any)[0].(map[string]any)["name"])
+	}
 	if !lo.Contains(controllerValidKinds, controller["kind"].(string)) {
 		return fmt.Errorf("controller kind %s is not a valid controller kind", controller["kind"].(string))
 	}
 	childContainers := getChildContainers(child)
 	controllerContainers := getControllerContainers(controller)
 	if len(childContainers) != len(controllerContainers) {
-		return fmt.Errorf("length of controller container does not match child containers")
+		return fmt.Errorf("number of controller container does not match child containers")
 	}
 	childContainerNames := lo.Map(childContainers, func(container any, _ int) string {
-		return container.(map[string]any)["name"].(string)
+		return getContainerKey(container.(map[string]any))
 	})
 	controllerContainerNames := lo.Map(controllerContainers, func(container any, _ int) string {
-		return container.(map[string]any)["name"].(string)
+		return getContainerKey(container.(map[string]any))
 	})
 	for _, childContainerName := range childContainerNames {
 		if !lo.Contains(controllerContainerNames, childContainerName) {
 			return fmt.Errorf("controller does not match child containers names")
 		}
 	}
+	childContainerSecurityContext := map[string]any{}
+	lo.ForEach(childContainers, func(container any, _ int) {
+		childContainerSecurityContext[getContainerKey(container.(map[string]any))] = container.(map[string]any)["securityContext"]
+	})
+	controllerContainersSecurityContext := map[string]any{}
+	lo.ForEach(controllerContainers, func(container any, _ int) {
+		controllerContainersSecurityContext[getContainerKey(container.(map[string]any))] = container.(map[string]any)["securityContext"]
+	})
+	for key, childContainerSecurityContext := range childContainerSecurityContext {
+		if !reflect.DeepEqual(childContainerSecurityContext, controllerContainersSecurityContext[key]) {
+			fmt.Println("X=====", childContainerSecurityContext)
+			fmt.Println("Y=====", controllerContainersSecurityContext[key])
+			return fmt.Errorf("controller does not match child containers securityContext")
+		}
+	}
 	return nil
+}
+
+func getContainerKey(container map[string]any) string {
+	return fmt.Sprintf("%s/%s/%s", container["name"], container["image"], container["tag"])
 }
 
 func getChildContainers(child map[string]any) []any {
