@@ -1,0 +1,274 @@
+{
+    "apiVersion": "batch/v1",
+    "kind": "Job",
+    "metadata": {
+        "annotations": {
+            "cronjob.kubernetes.io/instantiate": "manual"
+        },
+        "creationTimestamp": "2024-08-02T13:17:59Z",
+        "generation": 1,
+        "labels": {
+            "app.kubernetes.io/name": "trivy",
+            "app.kubernetes.io/part-of": "insights-agent",
+            "batch.kubernetes.io/controller-uid": "a21ce255-5f6a-47fb-8a3f-f5d06ebe8082",
+            "batch.kubernetes.io/job-name": "trivy",
+            "controller-uid": "a21ce255-5f6a-47fb-8a3f-f5d06ebe8082",
+            "job-name": "trivy"
+        },
+        "name": "trivy",
+        "namespace": "insights-agent",
+        "ownerReferences": [
+            {
+                "apiVersion": "batch/v1",
+                "blockOwnerDeletion": true,
+                "controller": true,
+                "kind": "CronJob",
+                "name": "trivy",
+                "uid": "7ba6f17d-1a8f-4824-aaf3-a829da8c3a8d"
+            }
+        ],
+        "resourceVersion": "1332950",
+        "uid": "a21ce255-5f6a-47fb-8a3f-f5d06ebe8082"
+    },
+    "spec": {
+        "activeDeadlineSeconds": 2400,
+        "backoffLimit": 1,
+        "completionMode": "NonIndexed",
+        "completions": 1,
+        "manualSelector": false,
+        "parallelism": 1,
+        "podReplacementPolicy": "TerminatingOrFailed",
+        "selector": {
+            "matchLabels": {
+                "batch.kubernetes.io/controller-uid": "a21ce255-5f6a-47fb-8a3f-f5d06ebe8082"
+            }
+        },
+        "suspend": false,
+        "template": {
+            "metadata": {
+                "annotations": {
+                    "cluster-autoscaler.kubernetes.io/safe-to-evict": "true"
+                },
+                "creationTimestamp": null,
+                "labels": {
+                    "app.kubernetes.io/name": "trivy",
+                    "app.kubernetes.io/part-of": "insights-agent",
+                    "batch.kubernetes.io/controller-uid": "a21ce255-5f6a-47fb-8a3f-f5d06ebe8082",
+                    "batch.kubernetes.io/job-name": "trivy",
+                    "controller-uid": "a21ce255-5f6a-47fb-8a3f-f5d06ebe8082",
+                    "job-name": "trivy"
+                }
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "command": [
+                            "./report.sh"
+                        ],
+                        "env": [
+                            {
+                                "name": "FAIRWINDS_INSIGHTS_HOST",
+                                "value": "https://staging.insights.fairwinds.com"
+                            },
+                            {
+                                "name": "FAIRWINDS_ORG",
+                                "value": "acme-co"
+                            },
+                            {
+                                "name": "FAIRWINDS_CLUSTER",
+                                "value": "james-cluster"
+                            },
+                            {
+                                "name": "FAIRWINDS_TOKEN",
+                                "valueFrom": {
+                                    "secretKeyRef": {
+                                        "key": "token",
+                                        "name": "insights-agent-token"
+                                    }
+                                }
+                            },
+                            {
+                                "name": "TRIVY_CACHE_DIR",
+                                "value": "/var/tmp"
+                            },
+                            {
+                                "name": "MAX_SCANS",
+                                "value": "20"
+                            },
+                            {
+                                "name": "IGNORE_UNFIXED",
+                                "value": "false"
+                            },
+                            {
+                                "name": "MAX_CONCURRENT_SCANS",
+                                "value": "1"
+                            },
+                            {
+                                "name": "NAMESPACE_BLOCKLIST"
+                            },
+                            {
+                                "name": "NAMESPACE_ALLOWLIST"
+                            }
+                        ],
+                        "image": "quay.io/fairwinds/fw-trivy:0.29",
+                        "imagePullPolicy": "Always",
+                        "name": "trivy",
+                        "resources": {
+                            "requests": {
+                                "cpu": "100m",
+                                "memory": "1Gi"
+                            }
+                        },
+                        "securityContext": {
+                            "allowPrivilegeEscalation": false,
+                            "capabilities": {
+                                "drop": [
+                                    "ALL"
+                                ]
+                            },
+                            "privileged": false,
+                            "readOnlyRootFilesystem": true,
+                            "runAsGroup": 10324,
+                            "runAsNonRoot": true,
+                            "runAsUser": 10324
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/output",
+                                "name": "output"
+                            },
+                            {
+                                "mountPath": "/var/tmp",
+                                "name": "vartmp"
+                            },
+                            {
+                                "mountPath": "/tmp",
+                                "name": "tmp"
+                            }
+                        ]
+                    },
+                    {
+                        "command": [
+                            "./uploader.sh",
+                            "--datatype",
+                            "trivy",
+                            "--timeout",
+                            "2400",
+                            "--organization",
+                            "acme-co",
+                            "--cluster",
+                            "james-cluster",
+                            "--host",
+                            "https://staging.insights.fairwinds.com",
+                            "--version",
+                            "0.29",
+                            "--file",
+                            "/output/trivy.json"
+                        ],
+                        "env": [
+                            {
+                                "name": "FAIRWINDS_TOKEN",
+                                "valueFrom": {
+                                    "secretKeyRef": {
+                                        "key": "token",
+                                        "name": "insights-agent-token"
+                                    }
+                                }
+                            },
+                            {
+                                "name": "FAIRWINDS_AGENT_CHART_VERSION",
+                                "value": "4.3.1"
+                            },
+                            {
+                                "name": "SEND_FAILURES",
+                                "value": "true"
+                            },
+                            {
+                                "name": "POD_NAME",
+                                "valueFrom": {
+                                    "fieldRef": {
+                                        "apiVersion": "v1",
+                                        "fieldPath": "metadata.name"
+                                    }
+                                }
+                            }
+                        ],
+                        "image": "quay.io/fairwinds/insights-uploader:0.5",
+                        "imagePullPolicy": "Always",
+                        "name": "insights-uploader",
+                        "resources": {
+                            "limits": {
+                                "cpu": "250m",
+                                "memory": "512Mi"
+                            },
+                            "requests": {
+                                "cpu": "100m",
+                                "memory": "128Mi"
+                            }
+                        },
+                        "securityContext": {
+                            "allowPrivilegeEscalation": false,
+                            "capabilities": {
+                                "drop": [
+                                    "ALL"
+                                ]
+                            },
+                            "privileged": false,
+                            "readOnlyRootFilesystem": true,
+                            "runAsGroup": 1000,
+                            "runAsNonRoot": true,
+                            "runAsUser": 1000
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/output",
+                                "name": "output"
+                            }
+                        ]
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "restartPolicy": "Never",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "serviceAccount": "insights-agent-trivy",
+                "serviceAccountName": "insights-agent-trivy",
+                "terminationGracePeriodSeconds": 30,
+                "volumes": [
+                    {
+                        "emptyDir": {},
+                        "name": "output"
+                    },
+                    {
+                        "emptyDir": {},
+                        "name": "tmp"
+                    },
+                    {
+                        "emptyDir": {},
+                        "name": "vartmp"
+                    }
+                ]
+            }
+        }
+    },
+    "status": {
+        "completionTime": "2024-08-02T13:22:54Z",
+        "conditions": [
+            {
+                "lastProbeTime": "2024-08-02T13:22:54Z",
+                "lastTransitionTime": "2024-08-02T13:22:54Z",
+                "status": "True",
+                "type": "Complete"
+            }
+        ],
+        "ready": 0,
+        "startTime": "2024-08-02T13:17:59Z",
+        "succeeded": 1,
+        "terminating": 0,
+        "uncountedTerminatedPods": {}
+    }
+}

@@ -79,3 +79,20 @@ func readFile(t *testing.T, file string) map[string]any {
 	assert.NoError(t, err)
 	return object
 }
+
+func TestValidateIfControllerMatches(t *testing.T) {
+	err := ValidateIfControllerMatches(readFile(t, "./testdata/pod1.json"), readFile(t, "./testdata/controller1.json"))
+	assert.NoError(t, err)
+	err = ValidateIfControllerMatches(readFile(t, "./testdata/pod2.json"), readFile(t, "./testdata/controller1.json"))
+	assert.Error(t, err)
+	assert.Equal(t, "controller name trivy does not match ownerReference name invalid2", err.Error())
+	err = ValidateIfControllerMatches(readFile(t, "./testdata/pod3.json"), readFile(t, "./testdata/controller1.json"))
+	assert.Error(t, err)
+	assert.Equal(t, "controller does not match child containers names", err.Error())
+	err = ValidateIfControllerMatches(readFile(t, "./testdata/pod4.json"), readFile(t, "./testdata/controller1.json"))
+	assert.Error(t, err)
+	assert.Equal(t, "number of controller container does not match child containers", err.Error())
+	err = ValidateIfControllerMatches(readFile(t, "./testdata/pod5.json"), readFile(t, "./testdata/controller1.json"))
+	assert.Error(t, err)
+	assert.Equal(t, "controller does not match child containers securityContext", err.Error())
+}
