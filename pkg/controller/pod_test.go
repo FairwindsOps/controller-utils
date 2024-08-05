@@ -95,5 +95,4 @@ func TestValidateIfControllerMatches(t *testing.T) {
 	err = ValidateIfControllerMatches(readFile(t, "./testdata/pod5.json"), readFile(t, "./testdata/controller1.json"))
 	assert.Error(t, err)
 	assert.Equal(t, "controller does not match child containers securityContext", err.Error())
-
 }
