@@ -5,7 +5,7 @@ go 1.21
 require (
 	github.com/go-logr/logr v1.4.2
 	github.com/go-logr/stdr v1.2.2
-	github.com/stretchr/testify v1.8.4
+	github.com/stretchr/testify v1.10.0
 	k8s.io/api v0.29.0
 	k8s.io/apimachinery v0.29.0
 	k8s.io/client-go v0.29.0
