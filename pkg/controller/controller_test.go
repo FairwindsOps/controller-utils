@@ -18,14 +18,17 @@ import (
 	"context"
 	"testing"
 
+	"github.com/go-logr/logr/funcr"
 	testLog "github.com/go-logr/logr/testing"
 	"github.com/stretchr/testify/assert"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic/fake"
+	k8stesting "k8s.io/client-go/testing"
 
 	"github.com/fairwindsops/controller-utils/pkg/log"
 )
@@ -161,6 +164,37 @@ func TestGetTopController(t *testing.T) {
 	assert.Equal(t, "dep", controller.GetName())
 	controller, err = client.GetTopController(pod2, map[string]unstructured.Unstructured{})
 	assert.Error(t, err)
+}
+
+func TestGetTopControllerForbiddenOwner(t *testing.T) {
+	client, pod, _, _, _ := setupFakeData(t)
+	deployments := schema.GroupResource{Group: "apps", Resource: "deployments"}
+	client.Dynamic.(*fake.FakeDynamicClient).PrependReactor("list", "deployments",
+		func(action k8stesting.Action) (bool, runtime.Object, error) {
+			return true, nil, apierrors.NewForbidden(deployments, "", nil)
+		})
+	forbiddenOwnerKinds = map[schema.GroupKind]bool{}
+	var logged []string
+	log.SetLogger(funcr.New(func(prefix, args string) { logged = append(logged, args) }, funcr.Options{}))
+
+	for i := 0; i < 2; i++ {
+		controller, err := client.GetTopController(pod, map[string]unstructured.Unstructured{})
+		assert.NoError(t, err)
+		assert.Equal(t, "rs", controller.GetName())
+	}
+	assert.Len(t, logged, 1)
+	assert.Contains(t, logged[0], `"kind"="Deployment.apps"`)
+}
+
+func TestGetTopControllerOwnerListError(t *testing.T) {
+	client, pod, _, _, _ := setupFakeData(t)
+	client.Dynamic.(*fake.FakeDynamicClient).PrependReactor("list", "deployments",
+		func(action k8stesting.Action) (bool, runtime.Object, error) {
+			return true, nil, apierrors.NewInternalError(assert.AnError)
+		})
+	controller, err := client.GetTopController(pod, map[string]unstructured.Unstructured{})
+	assert.Error(t, err)
+	assert.Equal(t, "rs", controller.GetName())
 }
 
 func TestGetAllTopControllers(t *testing.T) {
