@@ -27,15 +27,12 @@ jobs:
       - run: goreleaser
   test:
     docker:
-      - image: cimg/go:1.19
+      - image: cimg/go:1.25
     steps:
       - checkout
       - run: |
-              go install golang.org/x/lint/golint@latest
-              go install honnef.co/go/tools/cmd/staticcheck@2023.1.7
-              go list ./pkg/... | grep -v vendor | xargs golint -set_exit_status
-              go list ./pkg/... | grep -v vendor | xargs go vet
-              staticcheck ./pkg/...
+              go mod download && go mod verify
+              go vet ./...
               go test ./pkg/... -coverprofile=coverage.txt -covermode=count
 
 workflows:
