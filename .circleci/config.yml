@@ -17,14 +17,14 @@ references:
 jobs:
   release:
     docker:
-      - image: goreleaser/goreleaser:v1.2.5
+      - image: goreleaser/goreleaser:v2.20.3
     steps:
       - checkout
       - *install_vault
       - rok8s/get_vault_env:
           vault_path: repo/global/env
       - run: echo 'export GORELEASER_CURRENT_TAG="${CIRCLE_TAG}"' >> $BASH_ENV
-      - run: goreleaser
+      - run: goreleaser release
   test:
     docker:
       - image: cimg/go:1.26
