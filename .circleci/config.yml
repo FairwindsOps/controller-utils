@@ -1,56 +1,125 @@
+## DO NOT EDIT - Managed by Terraform
 version: 2.1
 
 orbs:
-  rok8s: fairwinds/rok8s-scripts@11
+  rok8s: fairwinds/rok8s-scripts@17.1.1
 
 references:
-  install_vault: &install_vault
+  install_vault_machine: &install_vault_machine
     run:
       name: install hashicorp vault
       command: |
-        apk --update add curl yq
+        sudo apt-get update -y && sudo apt-get install -y curl unzip
         cd /tmp
-        curl -LO https://releases.hashicorp.com/vault/1.9.2/vault_1.9.2_linux_amd64.zip
-        unzip vault_1.9.2_linux_amd64.zip
-        mv vault /usr/bin/vault
+        curl -LO https://releases.hashicorp.com/vault/2.2.2/vault_2.2.2_linux_amd64.zip
+        echo '5700edf139113609962fe371af7d2a53de8ecb720d545dc39b43de204515d3c4  vault_2.2.2_linux_amd64.zip' | sha256sum -c
+        unzip -o vault_2.2.2_linux_amd64.zip
+        sudo mv vault /usr/bin/vault
+  setup_qemu_binfmt: &setup_qemu_binfmt
+    run:
+      name: Setup QEMU for multi-arch Docker builds
+      command: |
+        sudo apt-get update -y
+        sudo apt-get install -y qemu-user-static binfmt-support
+        docker buildx create --use || true
+        docker buildx inspect --bootstrap
 
 jobs:
-  release:
-    docker:
-      - image: goreleaser/goreleaser:v2.20.3
-    steps:
-      - checkout
-      - *install_vault
-      - rok8s/get_vault_env:
-          vault_path: repo/global/env
-      - run: echo 'export GORELEASER_CURRENT_TAG="${CIRCLE_TAG}"' >> $BASH_ENV
-      - run: goreleaser release
   test:
     docker:
-      - image: cimg/go:1.26
+      - image: cimg/go:1.27.4
     steps:
       - checkout
-      - run: |
-              go mod download && go mod verify
-              go vet ./...
-              go test ./pkg/... -coverprofile=coverage.txt -covermode=count
+      - run:
+          name: Go Mod Download
+          command: go mod download && go mod verify
+      - run:
+          name: test
+          command: |
+            go test -v -coverprofile=coverage.txt -covermode=atomic ./pkg/...
+            go vet ./...
+  snapshot:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large
+    steps:
+      - checkout
+      - *setup_qemu_binfmt
+      - run:
+          name: Run GoReleaser snapshot
+          command: |
+            docker run --rm \
+              -v /var/run/docker.sock:/var/run/docker.sock \
+              -v "$(pwd):/workspace" -w /workspace \
+              -e CIRCLE_SHA1 \
+              -e CIRCLE_BRANCH \
+              -e CIRCLE_TAG \
+              goreleaser/goreleaser:v2.20.2 release --snapshot --skip=sign
+      - store_artifacts:
+          path: dist
+          destination: snapshot
+  release:
+    machine:
+      image: ubuntu-2204:current
+    resource_class: large
+    shell: /bin/bash
+    steps:
+      - checkout
+      - *install_vault_machine
+      - rok8s/get_vault_env:
+          vault_path: repo/global/env
+      - run:
+          name: docker login Google Artifact Registry
+          command: |
+            echo "$GCP_ARTIFACTREADWRITE_JSON_KEY" | base64 -d | docker login -u _json_key --password-stdin us-docker.pkg.dev
+      - *setup_qemu_binfmt
+      - run:
+          name: Run GoReleaser release
+          command: |
+            export GORELEASER_CURRENT_TAG="${CIRCLE_TAG}"
+            docker run --rm \
+              -v /var/run/docker.sock:/var/run/docker.sock \
+              -v "$(pwd):/workspace" -w /workspace \
+              -v "${HOME}/.docker:/root/.docker" \
+              -e GORELEASER_CURRENT_TAG \
+              -e CIRCLE_TAG \
+              -e CIRCLE_SHA1 \
+              -e GO111MODULE=on \
+              -e GITHUB_TOKEN \
+              -e VAULT_ADDR \
+              -e VAULT_TOKEN \
+              goreleaser/goreleaser:v2.20.2 release
 
 workflows:
   version: 2
-  test:
+  test_and_build:
     jobs:
       - test:
+          filters:
+            tags:
+              ignore: /.*/
+      - snapshot:
+          requires:
+            - test
           filters:
             branches:
               only: /.*/
             tags:
-              only: /v[0-9]+(\.[0-9]+)*(-.*)*/
-      - release:
-          requires:
-          - test
+              ignore: /.*/
+  release:
+    jobs:
+      - test:
           filters:
             branches:
               ignore: /.*/
             tags:
-              only: /v[0-9]+(\.[0-9]+)*(-.*)*/
-
+              only: /v.*/
+      - release:
+          requires:
+            - test
+          context: org-global
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /v.*/
