@@ -18,8 +18,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -30,6 +32,11 @@ import (
 )
 
 const podStatusRunning = "Running"
+
+var (
+	forbiddenOwnerKinds      = map[schema.GroupKind]bool{}
+	forbiddenOwnerKindsMutex sync.Mutex
+)
 
 type knownKind struct {
 	kind       string
@@ -220,6 +227,10 @@ func (client Client) GetTopController(unstructuredObject unstructured.Unstructur
 		abstractObject, ok := objectCache[key]
 		if !ok {
 			err := client.cacheAllObjectsOfKind(firstOwner.APIVersion, firstOwner.Kind, unstructuredObject.GetNamespace(), objectCache, false)
+			if apierrors.IsForbidden(err) {
+				logForbiddenOwnerKind(schema.FromAPIVersionAndKind(firstOwner.APIVersion, firstOwner.Kind).GroupKind())
+				return unstructuredObject, nil
+			}
 			if err != nil {
 				return unstructuredObject, err
 			}
@@ -233,6 +244,18 @@ func (client Client) GetTopController(unstructuredObject unstructured.Unstructur
 	return unstructuredObject, nil
 }
 
+// logForbiddenOwnerKind logs once per kind that its objects are skipped as owners. Leaving out the permission is often
+// deliberate, e.g. for a custom resource that cannot be a target, but it can also be a forgotten permission.
+func logForbiddenOwnerKind(groupKind schema.GroupKind) {
+	forbiddenOwnerKindsMutex.Lock()
+	defer forbiddenOwnerKindsMutex.Unlock()
+	if forbiddenOwnerKinds[groupKind] {
+		return
+	}
+	forbiddenOwnerKinds[groupKind] = true
+	log.GetLogger().Info("Not allowed to list this owner kind, treating the objects it owns as top controllers. Grant list permission if its objects should be the top controllers instead", "kind", groupKind.String())
+}
+
 func (client Client) cacheAllObjectsOfKind(apiVersion, kind, namespace string, objectCache map[string]unstructured.Unstructured, mustBeTopLevel bool) error {
 	log.GetLogger().V(9).Info("cache all", apiVersion, kind)
 	fqKind := schema.FromAPIVersionAndKind(apiVersion, kind)
@@ -244,7 +267,9 @@ func (client Client) cacheAllObjectsOfKind(apiVersion, kind, namespace string, o
 
 	objects, err := client.Dynamic.Resource(mapping.Resource).Namespace(namespace).List(client.Context, metav1.ListOptions{})
 	if err != nil {
-		log.GetLogger().Error(err, "Error retrieving parent object", mapping.Resource.Version, mapping.Resource.Resource)
+		if !apierrors.IsForbidden(err) {
+			log.GetLogger().Error(err, "Error retrieving parent object", mapping.Resource.Version, mapping.Resource.Resource)
+		}
 		return err
 	}
 	for idx, object := range objects.Items {
